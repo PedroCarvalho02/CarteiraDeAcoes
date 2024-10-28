@@ -1,30 +1,37 @@
-import { createDrawerNavigator } from "@react-navigation/drawer"
+import { createStackNavigator } from "@react-navigation/stack";
 import { NavigationContainer } from "@react-navigation/native";
 import LoginView from "../view/LoginView";
 import HomeView from "../view/HomeView";
 import AcoesView from "../view/AcoesView";
 import DepositoView from "../view/DepositoView";
 import SaqueView from "../view/SaqueView";
+import RentabilidadeView from "../view/RentabilidadeView";
+import RegisterView from "../view/RegisterView";
 
 
-const Drawer = createDrawerNavigator();
+
+const Stack = createStackNavigator();
 
 export default MenuNavigator = () =>
 {
     return (
         <NavigationContainer>
-            <Drawer.Navigator initialRouteName="homse">
-                <Drawer.Screen name="login" component={LoginView} 
+            <Stack.Navigator initialRouteName="home">
+                <Stack.Screen name="login" component={LoginView} 
                 options={{headerTitle: ""}}/>
-                <Drawer.Screen name="home" component={HomeView} 
+                <Stack.Screen name="register" component={RegisterView} 
                 options={{headerTitle: ""}}/>
-                <Drawer.Screen name="acoes" component={AcoesView} 
+                <Stack.Screen name="home" component={HomeView} 
                 options={{headerTitle: ""}}/>
-                 <Drawer.Screen name="deposito" component={DepositoView} 
+                <Stack.Screen name="acoes" component={AcoesView} 
                 options={{headerTitle: ""}}/>
-                 <Drawer.Screen name="saque" component={SaqueView} 
+                 <Stack.Screen name="deposito" component={DepositoView} 
                 options={{headerTitle: ""}}/>
-            </Drawer.Navigator>
+                 <Stack.Screen name="saque" component={SaqueView} 
+                options={{headerTitle: ""}}/>
+                 <Stack.Screen name="rentabilidade" component={RentabilidadeView} 
+                options={{headerTitle: ""}}/>
+            </Stack.Navigator>
         </NavigationContainer>
 
     )
