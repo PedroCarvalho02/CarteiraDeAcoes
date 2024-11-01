@@ -63,6 +63,7 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
 
+  
     try {
         const usuario = await dbGet('SELECT * FROM users WHERE email = ?', [email]);
         if (!usuario) {
