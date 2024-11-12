@@ -12,8 +12,8 @@ const AuthView = ({ navigation }) => {
     const [telefone, setTelefone] = useState('');
     const [cep, setCep] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const [isLoginMode, setIsLoginMode] = useState(true); // Estado para alternar entre login e registro
-    const { login } = useAuth(); // Usando o contexto de autenticação
+    const [isLoginMode, setIsLoginMode] = useState(true);
+    const { login } = useAuth();
 
     const Login = async () => {
         if (!email || !senha) {
@@ -31,7 +31,7 @@ const AuthView = ({ navigation }) => {
 
     const Registrar = async () => {
         try {
-            const response = await fetch('https://e8a4-186-235-96-214.ngrok-free.app/register', {
+            const response = await fetch('https://f0ab-186-235-96-214.ngrok-free.app/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -43,7 +43,7 @@ const AuthView = ({ navigation }) => {
 
             if (response.ok) {
                 console.log(data.message);
-                setIsLoginMode(true); // Voltar para a tela de login após o registro
+                setIsLoginMode(true);
             } else {
                 setErrorMessage(data.error || 'Erro ao registrar: ' + (data.details || data.message));
             }

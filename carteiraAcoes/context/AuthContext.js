@@ -3,14 +3,14 @@ import React, { createContext, useState, useContext } from 'react';
 // Criar o contexto
 const AuthContext = createContext();
 
-// Provedor de autenticação
+
 export const AuthProvider = ({ children }) => {
     const [autenticado, setAutenticado] = useState(false);
     const [user, setUser] = useState(null);
 
     const login = async (email, senha) => {
         try {
-            const response = await fetch('https://e8a4-186-235-96-214.ngrok-free.app/login', {
+            const response = await fetch('https://f0ab-186-235-96-214.ngrok-free.app/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json();
             if (response.ok) {
                 setAutenticado(true);
-                setUser(data.user); // Ajuste conforme a estrutura de resposta da sua API
+                setUser(data.user);
                 return data;
             } else {
                 throw new Error(data.message || 'Login falhou');
