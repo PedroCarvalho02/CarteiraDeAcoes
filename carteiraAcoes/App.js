@@ -1,6 +1,7 @@
+// App.js
 
 import MenuNavigator from './src/components/Menu/MenuNavigator';
-import { AuthProvider } from './context/AuthContext.js';
+import { AuthProvider } from './src/context/AuthContext.js'; // Caminho corrigido
 
 export default function App() {
   return (
@@ -9,5 +10,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
-

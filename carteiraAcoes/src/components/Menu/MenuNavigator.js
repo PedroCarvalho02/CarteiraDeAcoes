@@ -7,7 +7,7 @@ import DepositoView from '../view/DepositoView';
 import SaqueView from '../view/SaqueView';
 import RentabilidadeView from '../view/RentabilidadeView';
 import AuthView from '../view/AuthView';
-import { useAuth } from '../../../context/AuthContext'; 
+import { useAuth } from '../../context/AuthContext'; 
 
 const Drawer = createDrawerNavigator();
 

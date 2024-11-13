@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { TextInput, Button } from "react-native-paper";
-import { useAuth } from "../../../context/AuthContext.js";
+// src/components/view/AuthView.js
 
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from "react-native";
+import { TextInput, Button } from "react-native-paper";
+import { useAuth } from "../../context/AuthContext.js"; // Caminho corrigido
+//import * as AuthSession from 'expo-auth-session';
 
 const AuthView = ({ navigation }) => {
     const [email, setEmail] = useState('');
@@ -14,6 +16,33 @@ const AuthView = ({ navigation }) => {
     const [errorMessage, setErrorMessage] = useState('');
     const [isLoginMode, setIsLoginMode] = useState(true);
     const { login } = useAuth();
+
+    useEffect(() => {
+        const handleDeepLink = (event) => {
+            const { url } = event;
+            const token = getTokenFromUrl(url);
+            if (token) {
+                navigation.navigate('home');
+            }
+        };
+
+        Linking.addEventListener('url', handleDeepLink);
+
+        return () => {
+            Linking.removeEventListener('url', handleDeepLink);
+        };
+    }, []);
+
+    const getTokenFromUrl = (url) => {
+        const regex = /token=([^&]+)/;
+        const match = regex.exec(url);
+        return match ? match[1] : null;
+    };
+
+    const handleGoogleOAuth = () => {
+        const authUrl = 'https://hog-chief-visually.ngrok-free.app/auth';
+        Linking.openURL(authUrl);
+    };
 
     const Login = async () => {
         if (!email || !senha) {
@@ -28,10 +57,9 @@ const AuthView = ({ navigation }) => {
         }
     };
 
-
     const Registrar = async () => {
         try {
-            const response = await fetch('https://f0ab-186-235-96-214.ngrok-free.app/register', {
+            const response = await fetch('https://hog-chief-visually.ngrok-free.app/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -86,6 +114,14 @@ const AuthView = ({ navigation }) => {
                     >
                         Entrar
                     </Button>
+                    <Button
+                        mode="outlined"
+                        onPress={handleGoogleOAuth}
+                        style={styles.googleButton}
+                        labelStyle={styles.buttonLabel}
+                    >
+                        Entrar com Google
+                    </Button>
                 </>
             ) : (
                 <>
@@ -104,43 +140,6 @@ const AuthView = ({ navigation }) => {
                         onChangeText={text => setCpf(text)}
                         mode="outlined"
                         placeholder="Digite seu CPF"
-                        style={styles.input}
-                        theme={{ colors: { primary: '#6200ee' } }}
-                    />
-                    <TextInput
-                        label="Telefone"
-                        value={telefone}
-                        onChangeText={text => setTelefone(text)}
-                        mode="outlined"
-                        placeholder="Digite seu telefone"
-                        style={styles.input}
-                        theme={{ colors: { primary: '#6200ee' } }}
-                    />
-                    <TextInput
-                        label="CEP"
-                        value={cep}
-                        onChangeText={text => setCep(text)}
-                        mode="outlined"
-                        placeholder="Digite seu CEP"
-                        style={styles.input}
-                        theme={{ colors: { primary: '#6200ee' } }}
-                    />
-                    <TextInput
-                        label="Email"
-                        value={email}
-                        onChangeText={text => setEmail(text)}
-                        mode="outlined"
-                        placeholder="Digite um email"
-                        style={styles.input}
-                        theme={{ colors: { primary: '#6200ee' } }}
-                    />
-                    <TextInput
-                        label="Senha"
-                        secureTextEntry
-                        value={senha}
-                        onChangeText={text => setSenha(text)}
-                        mode="outlined"
-                        placeholder="Digite uma senha"
                         style={styles.input}
                         theme={{ colors: { primary: '#6200ee' } }}
                     />
@@ -190,6 +189,14 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 5,
         backgroundColor: '#6200ee',
+        marginBottom: 10,
+    },
+    googleButton: {
+        width: '100%',
+        paddingVertical: 10,
+        borderRadius: 5,
+        borderColor: '#6200ee',
+        borderWidth: 1,
     },
     buttonLabel: {
         fontSize: 18,
