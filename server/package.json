@@ -5,6 +5,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "finnhub": "^1.2.19",
     "google-auth-library": "^9.14.2",
     "jsonwebtoken": "^9.0.2",
     "sequelize": "^6.37.5",

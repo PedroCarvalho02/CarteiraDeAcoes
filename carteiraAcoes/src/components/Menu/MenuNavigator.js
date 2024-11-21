@@ -1,3 +1,5 @@
+// src/components/Menu/MenuNavigator.js
+
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -16,7 +18,7 @@ const MenuNavigator = () => {
 
     return (
         <NavigationContainer>
-            <Drawer.Navigator initialRouteName="home">
+            <Drawer.Navigator initialRouteName={autenticado ? "home" : "login"}>
                 {autenticado ? (
                     <>
                         <Drawer.Screen name="home" component={HomeView} options={{ headerTitle: "" }} />
@@ -30,12 +32,11 @@ const MenuNavigator = () => {
                                 headerTitle: "Logout",
                                 drawerLabel: 'Sair',
                             }}
-                        >
-                            {() => {
+                            component={() => {
                                 logout();
                                 return null;
                             }}
-                        </Drawer.Screen>
+                        />
                     </>
                 ) : (
                     <Drawer.Screen name="login" component={AuthView} options={{ headerShown: false }} />

@@ -61,15 +61,14 @@ const dbRun = promisify(db.run).bind(db);
 
 async function createUser(user) {
     const { googleId, email, name, profilePicture } = user;
-
-    // Verifica se o googleId já existe
+    
     const existingUser = await findUserByGoogleId(googleId);
     if (existingUser) {
         throw new Error('Usuário com este googleId já existe.');
     }
 
     await dbRun(
-        'INSERT INTO users (googleId, email, nome) VALUES (?, ?, ?)',
+        'INSERT INTO users (googleId, email, nome, profilePicture) VALUES (?, ?, ?, ?)',
         [googleId, email, name, profilePicture]
     );
 }

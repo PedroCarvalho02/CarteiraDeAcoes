@@ -1,10 +1,9 @@
 // src/components/view/AuthView.js
 
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Linking } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { TextInput, Button } from "react-native-paper";
-import { useAuth } from "../../context/AuthContext.js"; // Caminho corrigido
-//import * as AuthSession from 'expo-auth-session';
+import { useAuth } from "../../context/AuthContext.js";
 
 const AuthView = ({ navigation }) => {
     const [email, setEmail] = useState('');
@@ -15,8 +14,16 @@ const AuthView = ({ navigation }) => {
     const [cep, setCep] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [isLoginMode, setIsLoginMode] = useState(true);
-    const { login } = useAuth();
+    const { login, autenticado } = useAuth();
 
+    // Navegação após autenticação
+    useEffect(() => {
+        if (autenticado) {
+            navigation.navigate('home');
+        }
+    }, [autenticado]);
+
+    // Manipulação de Deep Links
     useEffect(() => {
         const handleDeepLink = (event) => {
             const { url } = event;
@@ -26,10 +33,10 @@ const AuthView = ({ navigation }) => {
             }
         };
 
-        Linking.addEventListener('url', handleDeepLink);
+        const subscription = Linking.addEventListener('url', handleDeepLink);
 
         return () => {
-            Linking.removeEventListener('url', handleDeepLink);
+            subscription.remove();
         };
     }, []);
 
@@ -46,18 +53,23 @@ const AuthView = ({ navigation }) => {
 
     const Login = async () => {
         if (!email || !senha) {
-            alert('Por favor, preencha todos os campos.');
+            Alert.alert('Erro', 'Por favor, preencha todos os campos.');
             return;
         }
         try {
             await login(email, senha);
-            navigation.navigate('home'); // Navegar para a tela inicial após login bem-sucedido
+            // Navegação ocorrerá no useEffect
         } catch (error) {
-            alert('Erro ao logar: ' + error.message);
+            Alert.alert('Erro ao logar', error.message);
         }
     };
 
     const Registrar = async () => {
+        if (!email || !senha || !nome || !cpf || !telefone || !cep) {
+            Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+            return;
+        }
+
         try {
             const response = await fetch('https://hog-chief-visually.ngrok-free.app/register', {
                 method: 'POST',
@@ -72,6 +84,7 @@ const AuthView = ({ navigation }) => {
             if (response.ok) {
                 console.log(data.message);
                 setIsLoginMode(true);
+                Alert.alert('Sucesso', 'Registro realizado com sucesso! Por favor, faça login.');
             } else {
                 setErrorMessage(data.error || 'Erro ao registrar: ' + (data.details || data.message));
             }
@@ -95,6 +108,8 @@ const AuthView = ({ navigation }) => {
                         placeholder="Digite um email"
                         style={styles.input}
                         theme={{ colors: { primary: '#6200ee' } }}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
                     />
                     <TextInput
                         label="Senha"
@@ -140,6 +155,48 @@ const AuthView = ({ navigation }) => {
                         onChangeText={text => setCpf(text)}
                         mode="outlined"
                         placeholder="Digite seu CPF"
+                        style={styles.input}
+                        theme={{ colors: { primary: '#6200ee' } }}
+                        keyboardType="numeric"
+                    />
+                    <TextInput
+                        label="Telefone"
+                        value={telefone}
+                        onChangeText={text => setTelefone(text)}
+                        mode="outlined"
+                        placeholder="Digite seu telefone"
+                        style={styles.input}
+                        theme={{ colors: { primary: '#6200ee' } }}
+                        keyboardType="phone-pad"
+                    />
+                    <TextInput
+                        label="CEP"
+                        value={cep}
+                        onChangeText={text => setCep(text)}
+                        mode="outlined"
+                        placeholder="Digite seu CEP"
+                        style={styles.input}
+                        theme={{ colors: { primary: '#6200ee' } }}
+                        keyboardType="numeric"
+                    />
+                    <TextInput
+                        label="Email"
+                        value={email}
+                        onChangeText={text => setEmail(text)}
+                        mode="outlined"
+                        placeholder="Digite um email"
+                        style={styles.input}
+                        theme={{ colors: { primary: '#6200ee' } }}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
+                    <TextInput
+                        label="Senha"
+                        secureTextEntry
+                        value={senha}
+                        onChangeText={text => setSenha(text)}
+                        mode="outlined"
+                        placeholder="Digite uma senha"
                         style={styles.input}
                         theme={{ colors: { primary: '#6200ee' } }}
                     />
@@ -205,11 +262,13 @@ const styles = StyleSheet.create({
     errorMessage: {
         color: 'red',
         marginTop: 10,
+        textAlign: 'center',
     },
     link: {
         color: '#6200ee',
         marginTop: 20,
         fontSize: 16,
+        textAlign: 'center',
     },
 });
 
