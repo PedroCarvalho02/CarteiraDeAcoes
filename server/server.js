@@ -6,13 +6,21 @@ const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const { promisify } = require('util');
 const { OAuth2Client } = require('google-auth-library');
+const finnhub = require('finnhub');
+
+
 require('dotenv').config();
 
 const PORT = process.env.PORT || 3000;
 
+const api_key = finnhub.ApiClient.instance.authentications['api_key'];
+api_key.apiKey = process.env.FINNHUB_API_KEY;
+
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+const  finnhubClient  = new finnhub.DefaultApi();
 
 const db = new sqlite3.Database('./banco.db', (err) => {
     if (err) {
@@ -198,6 +206,26 @@ app.post('/login', async (req, res) => {
         res.status(200).json({ message: 'Login bem-sucedido!', token });
     } catch (error) {
         res.status(500).json({ error: 'Erro no servidor.' });
+    }
+});
+
+app.get('/stock-prices', async (req, res) => {
+    const symbols = req.query.symbols.split(',');
+    try {
+        const quotes = await Promise.all(symbols.map(symbol => {
+            return new Promise((resolve, reject) => {
+                finnhubClient.quote(symbol, (error, data, response) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve({ symbol, ...data });
+                    }
+                });
+            });
+        }));
+        res.json(quotes);
+    } catch (error) {
+        res.status(500).send('Erro ao buscar preços das ações');
     }
 });
 

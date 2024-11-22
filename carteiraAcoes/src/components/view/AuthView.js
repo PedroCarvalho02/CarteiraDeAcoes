@@ -5,7 +5,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-
 import { TextInput, Button } from "react-native-paper";
 import { useAuth } from "../../context/AuthContext.js";
 
-const AuthView = ({ navigation }) => {
+const AuthView = () => {
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
     const [nome, setNome] = useState('');
@@ -14,26 +14,30 @@ const AuthView = ({ navigation }) => {
     const [cep, setCep] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [isLoginMode, setIsLoginMode] = useState(true);
-    const { login, autenticado } = useAuth();
+    const { login, loginWithToken } = useAuth();
 
-    // Navegação após autenticação
     useEffect(() => {
-        if (autenticado) {
-            navigation.navigate('home');
-        }
-    }, [autenticado]);
-
-    // Manipulação de Deep Links
-    useEffect(() => {
-        const handleDeepLink = (event) => {
+        const handleDeepLink = async (event) => {
             const { url } = event;
             const token = getTokenFromUrl(url);
             if (token) {
-                navigation.navigate('home');
+                try {
+                    await loginWithToken(token);
+                    // A navegação ocorrerá automaticamente pelo RootNavigator
+                } catch (error) {
+                    Alert.alert('Erro de Autenticação', error.message);
+                }
             }
         };
 
         const subscription = Linking.addEventListener('url', handleDeepLink);
+
+        // Verificar se o aplicativo foi iniciado por um link profundo
+        Linking.getInitialURL().then((url) => {
+            if (url) {
+                handleDeepLink({ url });
+            }
+        });
 
         return () => {
             subscription.remove();
@@ -58,7 +62,7 @@ const AuthView = ({ navigation }) => {
         }
         try {
             await login(email, senha);
-            // Navegação ocorrerá no useEffect
+            // A navegação ocorrerá automaticamente pelo RootNavigator
         } catch (error) {
             Alert.alert('Erro ao logar', error.message);
         }
@@ -220,6 +224,7 @@ const AuthView = ({ navigation }) => {
             </TouchableOpacity>
         </View>
     );
+
 };
 
 const styles = StyleSheet.create({

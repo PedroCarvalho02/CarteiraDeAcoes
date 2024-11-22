@@ -1,6 +1,9 @@
-import { StyleSheet, View, Text } from "react-native";
+import React, { useEffect } from 'react';
+import { StyleSheet, View, Text } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 
-export default HomeView = () => {
+const HomeView = () => {
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Bem-vindo à sua Carteira de Ações!</Text>
@@ -30,3 +33,5 @@ const styles = StyleSheet.create({
         textAlign: 'center', // Centraliza o texto
     },
 });
+
+export default HomeView;

@@ -4,7 +4,6 @@ import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 const DepositoView = () => {
     const [depositValue, setDepositValue] = useState(0);
 
-  
 
     const handleSubmit = (e) => {
         e.preventDefault();
