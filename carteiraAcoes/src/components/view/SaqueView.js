@@ -1,3 +1,5 @@
+// SaqueView.js
+
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
@@ -9,42 +11,42 @@ const SaqueView = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        fetchSaldo();
-    }, []);
+        const fetchSaldo = async () => {
+            try {
+                setIsLoading(true);
+                const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
 
-    const fetchSaldo = async () => {
-        if (!token) {
-            console.warn('Token não disponível.');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            const response = await fetch('http://localhost:3000/saldo', { // Atualize a URL conforme necessário
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Erro na resposta:', errorText);
-                Alert.alert('Erro', 'Não foi possível obter o saldo.');
-                return;
+                const data = await response.json();
+                if (response.ok) {
+                    setSaldo(data.saldo);
+                } else {
+                    Alert.alert('Erro', data.error || 'Não foi possível obter o saldo.');
+                }
+            } catch (error) {
+                console.error('Erro ao obter saldo:', error);
+                Alert.alert('Erro', 'Ocorreu um erro ao obter o saldo.');
+            } finally {
+                setIsLoading(false);
             }
+        };
 
-            const data = await response.json();
-            setSaldo(data.saldo);
-        } catch (error) {
-            console.error('Erro ao obter saldo:', error);
-            Alert.alert('Erro', 'Ocorreu um erro ao obter o saldo.');
-        } finally {
-            setIsLoading(false);
+        if (token) {
+            fetchSaldo();
         }
-    };
+    }, [token]);
 
     const handleWithdraw = async () => {
+        console.log('🔄 Iniciando função handleWithdraw');
+        console.log('Valor do saque:', withdrawValue);
+        console.log('Token:', token);
+        
         const valorSaque = parseFloat(withdrawValue);
+        console.log('ValorSaque parseado:', valorSaque);
 
         if (isNaN(valorSaque) || valorSaque <= 0) {
             Alert.alert('Erro', 'Por favor, insira um valor válido para saque.');
@@ -58,7 +60,8 @@ const SaqueView = () => {
 
         try {
             setIsLoading(true);
-            const response = await fetch('http://localhost:3000/saque', { // Atualize a URL conforme necessário
+            console.log('Enviando requisição de saque...');
+            const response = await fetch('https://hog-chief-visually.ngrok-free.app/saque', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -67,7 +70,9 @@ const SaqueView = () => {
                 body: JSON.stringify({ valor: valorSaque }),
             });
 
+            console.log('Requisição enviada, aguardando resposta...');
             const data = await response.json();
+            console.log('Resposta da API:', data);
 
             if (response.ok) {
                 Alert.alert('Sucesso', data.message || 'Saque realizado com sucesso!');
@@ -77,10 +82,11 @@ const SaqueView = () => {
                 Alert.alert('Erro', data.error || 'Não foi possível realizar o saque.');
             }
         } catch (error) {
-            console.error('Erro ao realizar saque:', error);
+            console.error('⚠️ Erro ao realizar saque:', error);
             Alert.alert('Erro', 'Ocorreu um erro ao realizar o saque.');
         } finally {
             setIsLoading(false);
+            console.log('🔄 Função handleWithdraw finalizada');
         }
     };
 
@@ -90,22 +96,27 @@ const SaqueView = () => {
             {isLoading ? (
                 <ActivityIndicator size="large" color="#6200ee" />
             ) : (
-                <Text style={styles.saldo}>Saldo atual: R$ {saldo.toFixed(2)}</Text>
+                <>
+                    <Text style={styles.saldo}>Saldo atual: R$ {saldo.toFixed(2)}</Text>
+                    <View style={styles.form}>
+                        <Text style={styles.label}>Valor do Saque:</Text>
+                        <TextInput
+                            style={styles.input}
+                            keyboardType="numeric"
+                            value={withdrawValue}
+                            onChangeText={text => setWithdrawValue(text)}
+                            placeholder="Digite o valor a sacar"
+                        />
+                        <Button title="Sacar" onPress={handleWithdraw} disabled={isLoading} color="#6200ee" />
+                    </View>
+                    <View style={styles.buttonContainer}>
+                        <Button title="Atualizar Saldo" onPress={() => {
+                            setIsLoading(true);
+                            setSaldo(0);
+                        }} disabled={isLoading} color="#6200ee" />
+                    </View>
+                </>
             )}
-            <View style={styles.form}>
-                <Text style={styles.label}>Valor do Saque:</Text>
-                <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={withdrawValue}
-                    onChangeText={text => setWithdrawValue(text)}
-                    placeholder="Digite o valor a sacar"
-                />
-                <Button title="Sacar" onPress={handleWithdraw} disabled={isLoading} />
-            </View>
-            <View style={styles.buttonContainer}>
-                <Button title="Atualizar Saldo" onPress={fetchSaldo} disabled={isLoading} color="#6200ee" />
-            </View>
         </View>
     );
 };
@@ -122,7 +133,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 20,
         textAlign: 'center',
-        color: '#6200ee',
     },
     saldo: {
         fontSize: 18,

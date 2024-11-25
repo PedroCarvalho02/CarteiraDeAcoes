@@ -62,7 +62,6 @@ const AuthView = () => {
         }
         try {
             await login(email, senha);
-            // A navegação ocorrerá automaticamente pelo RootNavigator
         } catch (error) {
             Alert.alert('Erro ao logar', error.message);
         }

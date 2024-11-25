@@ -91,19 +91,21 @@ async function createUser(user) {
         [googleId, email, name, profilePicture]
     );
 }
-
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
+    
     if (!token) {
+        console.log('❌ Token não fornecido.');
         return res.status(401).json({ error: 'Token não fornecido.' });
     }
 
     jwt.verify(token, 'secret_key', (err, user) => {
         if (err) {
+            console.log('❌ Token inválido.');
             return res.status(403).json({ error: 'Token inválido.' });
         }
+        console.log(`🔑 Token verificado para userId: ${user.id}`);
         req.userId = user.id;
         next();
     });
@@ -269,6 +271,51 @@ app.post('/deposito', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Erro ao realizar depósito:', error);
         res.status(500).json({ error: 'Erro no servidor.' });
+    }
+});
+
+app.post('/saque', authenticateToken, async (req, res) => {
+    const { valor } = req.body;
+    console.log(`💸 Saque solicitado: valor = ${valor}, userId = ${req.userId}`);
+    
+    if (valor === undefined) {
+        console.log('❌ Erro: Campo "valor" não fornecido.');
+        return res.status(400).json({ error: 'O campo "valor" é obrigatório.' });
+    }
+
+    const valorSaque = parseFloat(valor);
+    if (isNaN(valorSaque) || valorSaque <= 0) {
+        console.log('❌ Erro: Valor do saque inválido.');
+        return res.status(400).json({ error: 'O valor do saque deve ser um número positivo.' });
+    }
+
+    try {
+        const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
+        console.log(`🔍 Saldo atual do usuário (ID: ${req.userId}): ${usuario ? usuario.saldo : 'Não encontrado'}`);
+        
+        if (!usuario) {
+            console.log('❌ Erro: Usuário não encontrado.');
+            return res.status(404).json({ error: 'Usuário não encontrado.' });
+        }
+
+        if (valorSaque > usuario.saldo) {
+            console.log('❌ Erro: Saldo insuficiente para saque.');
+            return res.status(400).json({ error: 'Saldo insuficiente para realizar o saque.' });
+        }
+
+        await dbRun('UPDATE users SET saldo = saldo - ? WHERE id = ?', [valorSaque, req.userId]);
+        console.log(`✅ Saque realizado: R$ ${valorSaque}, userId: ${req.userId}`);
+
+        const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
+        console.log(`💰 Novo saldo para userId ${req.userId}: R$ ${novoSaldo.saldo}`);
+
+        res.json({
+            message: 'Saque realizado com sucesso!',
+            saldo: novoSaldo.saldo
+        });
+    } catch (error) {
+        console.error('⚠️ Erro ao realizar saque:', error);
+        res.status(500).json({ error: 'Erro no servidor ao realizar o saque.' });
     }
 });
 
