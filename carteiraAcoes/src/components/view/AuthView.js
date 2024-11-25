@@ -23,7 +23,7 @@ const AuthView = () => {
             if (token) {
                 try {
                     await loginWithToken(token);
-                    // A navegação ocorrerá automaticamente pelo RootNavigator
+                   
                 } catch (error) {
                     Alert.alert('Erro de Autenticação', error.message);
                 }
@@ -32,7 +32,7 @@ const AuthView = () => {
 
         const subscription = Linking.addEventListener('url', handleDeepLink);
 
-        // Verificar se o aplicativo foi iniciado por um link profundo
+       
         Linking.getInitialURL().then((url) => {
             if (url) {
                 handleDeepLink({ url });

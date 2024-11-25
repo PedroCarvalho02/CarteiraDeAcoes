@@ -63,17 +63,21 @@ db.serialize(() => {
     });
 });
 
-db.run(`CREATE TABLE IF NOT EXISTS users (
+db.run(`CREATE TABLE IF NOT EXISTS user_acoes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL UNIQUE,
-    senha TEXT,
-    nome TEXT NOT NULL,
-    cpf TEXT UNIQUE,
-    telefone TEXT,
-    cep TEXT,
-    profilePicture TEXT,
-    saldo REAL DEFAULT 0
-)`);
+    user_id INTEGER NOT NULL,
+    simbolo TEXT NOT NULL,
+    quantidade INTEGER NOT NULL,
+    preco_compra REAL NOT NULL,
+    data_compra DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)`, (err) => {
+    if (err) {
+        console.error('Erro ao criar a tabela user_acoes:', err.message);
+    } else {
+        console.log('Tabela user_acoes pronta.');
+    }
+});
 
 const dbGet = promisify(db.get).bind(db);
 const dbRun = promisify(db.run).bind(db);
@@ -94,7 +98,7 @@ async function createUser(user) {
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    
+
     if (!token) {
         console.log('❌ Token não fornecido.');
         return res.status(401).json({ error: 'Token não fornecido.' });
@@ -277,7 +281,7 @@ app.post('/deposito', authenticateToken, async (req, res) => {
 app.post('/saque', authenticateToken, async (req, res) => {
     const { valor } = req.body;
     console.log(`💸 Saque solicitado: valor = ${valor}, userId = ${req.userId}`);
-    
+
     if (valor === undefined) {
         console.log('❌ Erro: Campo "valor" não fornecido.');
         return res.status(400).json({ error: 'O campo "valor" é obrigatório.' });
@@ -292,7 +296,7 @@ app.post('/saque', authenticateToken, async (req, res) => {
     try {
         const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
         console.log(`🔍 Saldo atual do usuário (ID: ${req.userId}): ${usuario ? usuario.saldo : 'Não encontrado'}`);
-        
+
         if (!usuario) {
             console.log('❌ Erro: Usuário não encontrado.');
             return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -338,6 +342,98 @@ app.get('/stock-prices', async (req, res) => {
         res.status(500).send('Erro ao buscar preços das ações');
     }
 });
+
+app.post('/comprar', authenticateToken, async (req, res) => {
+    const { simbolo, quantidade } = req.body;
+    const userId = req.userId;
+
+    if (!simbolo || !quantidade || quantidade <= 0) {
+        return res.status(400).json({ error: 'Simbolo e quantidade válidos são necessários.' });
+    }
+
+    try {
+        // Obter o preço atual da ação
+        const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao obter preço da ação.');
+        }
+        const data = await response.json();
+        if (data.length === 0 || !data[0].c) {
+            throw new Error('Preço da ação não encontrado.');
+        }
+        const precoAtual = data[0].c;
+
+        const totalCompra = quantidade * precoAtual;
+
+        // Verificar saldo do usuário
+        const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
+        if (!usuario) {
+            return res.status(404).json({ error: 'Usuário não encontrado.' });
+        }
+        if (usuario.saldo < totalCompra) {
+            return res.status(400).json({ error: 'Saldo insuficiente para realizar a compra.' });
+        }
+
+        // Verificar se o usuário já possui a ação
+        const acaoExistente = await dbGet('SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?', [userId, simbolo]);
+
+        if (acaoExistente) {
+            // Calcular novo preço médio
+            const novaQuantidade = acaoExistente.quantidade + quantidade;
+            const novoPrecoCompra = ((acaoExistente.quantidade * acaoExistente.preco_compra) + (quantidade * precoAtual)) / novaQuantidade;
+
+            // Atualizar a ação existente
+            await dbRun(
+                'UPDATE user_acoes SET quantidade = ?, preco_compra = ? WHERE id = ?',
+                [novaQuantidade, novoPrecoCompra, acaoExistente.id]
+            );
+        } else {
+            // Inserir nova ação
+            await dbRun(
+                'INSERT INTO user_acoes (user_id, simbolo, quantidade, preco_compra) VALUES (?, ?, ?, ?)',
+                [userId, simbolo, quantidade, precoAtual]
+            );
+        }
+
+        // Deduzir o saldo do usuário
+        await dbRun('UPDATE users SET saldo = saldo - ? WHERE id = ?', [totalCompra, userId]);
+
+        // Obter o novo saldo
+        const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
+
+        res.json({ message: `Compradas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(2)} cada.`, saldo: novoSaldo.saldo });
+    } catch (error) {
+        console.error('Erro ao comprar ação:', error);
+        res.status(500).json({ error: error.message || 'Erro ao realizar a compra.' });
+    }
+});
+
+app.get('/minhas-acoes', authenticateToken, async (req, res) => {
+    const userId = req.userId;
+
+    try {
+        const acoes = await new Promise((resolve, reject) => {
+            db.all(
+                'SELECT id, simbolo, quantidade, preco_compra, data_compra FROM user_acoes WHERE user_id = ?',
+                [userId],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows);
+                    }
+                }
+            );
+        });
+
+        res.json({ acoes });
+    } catch (error) {
+        console.error('Erro ao obter ações do usuário:', error);
+        res.status(500).json({ error: 'Erro ao obter ações do usuário.' });
+    }
+});
+
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

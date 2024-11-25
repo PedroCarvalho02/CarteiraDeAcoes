@@ -3,7 +3,7 @@ import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
 const DepositoView = () => {
-    const { token } = useAuth(); // Obtém o token do contexto
+    const { token } = useAuth(); 
     const [depositValue, setDepositValue] = useState(0);
     const [saldo, setSaldo] = useState(0);
 
@@ -26,7 +26,7 @@ const DepositoView = () => {
             }
         };
 
-        if (token) { // Certifica-se de que o token está disponível
+        if (token) { 
             fetchSaldo();
         }
     }, [token]);
