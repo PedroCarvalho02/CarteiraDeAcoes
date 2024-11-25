@@ -20,7 +20,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const  finnhubClient  = new finnhub.DefaultApi();
+const finnhubClient = new finnhub.DefaultApi();
 
 const db = new sqlite3.Database('./banco.db', (err) => {
     if (err) {
@@ -37,8 +37,19 @@ db.serialize(() => {
             console.error('Erro ao obter informações da tabela:', err.message);
         } else {
             const columnNames = columns.map(col => col.name);
+            if (!columnNames.includes('saldo')) {
+                db.run('ALTER TABLE users ADD COLUMN saldo REAL DEFAULT 0', (err) => {
+                    if (err) {
+                        console.error('Erro ao adicionar a coluna saldo:', err.message);
+                    } else {
+                        console.log('Coluna saldo adicionada com sucesso.');
+                    }
+                });
+            } else {
+                console.log('A coluna saldo já existe.');
+            }
             if (!columnNames.includes('googleId')) {
-                db.run('ALTER TABLE users ADD COLUMN googleId TEXT', (err) => {
+                db.run('ALTER TABLE users ADD COLUMN googleId TEXT UNIQUE', (err) => {
                     if (err) {
                         console.error('Erro ao adicionar a coluna googleId:', err.message);
                     } else {
@@ -52,7 +63,6 @@ db.serialize(() => {
     });
 });
 
-// Cria a tabela users se não existir
 db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT NOT NULL UNIQUE,
@@ -61,7 +71,8 @@ db.run(`CREATE TABLE IF NOT EXISTS users (
     cpf TEXT UNIQUE,
     telefone TEXT,
     cep TEXT,
-    profilePicture TEXT
+    profilePicture TEXT,
+    saldo REAL DEFAULT 0
 )`);
 
 const dbGet = promisify(db.get).bind(db);
@@ -69,7 +80,7 @@ const dbRun = promisify(db.run).bind(db);
 
 async function createUser(user) {
     const { googleId, email, name, profilePicture } = user;
-    
+
     const existingUser = await findUserByGoogleId(googleId);
     if (existingUser) {
         throw new Error('Usuário com este googleId já existe.');
@@ -79,6 +90,23 @@ async function createUser(user) {
         'INSERT INTO users (googleId, email, nome, profilePicture) VALUES (?, ?, ?, ?)',
         [googleId, email, name, profilePicture]
     );
+}
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Token não fornecido.' });
+    }
+
+    jwt.verify(token, 'secret_key', (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Token inválido.' });
+        }
+        req.userId = user.id;
+        next();
+    });
 }
 
 async function findUserByGoogleId(googleId) {
@@ -117,7 +145,7 @@ app.get('/auth/callback', async (req, res) => {
             process.env.GOOGLE_REDIRECT_URIS
         );
 
-        console.log('🔄 Obtendo tokens...');
+        console.log(' Obtendo tokens...');
         const { tokens } = await oauth2Client.getToken(code);
         oauth2Client.setCredentials(tokens);
 
@@ -131,7 +159,7 @@ app.get('/auth/callback', async (req, res) => {
         let user = await findUserByGoogleId(userInfo.sub);
 
         if (!user) {
-            console.log('🆕 Criando novo usuário');
+            console.log('Criando novo usuário');
             await createUser({
                 googleId: userInfo.sub,
                 email: userInfo.email,
@@ -149,11 +177,11 @@ app.get('/auth/callback', async (req, res) => {
         console.log('JWT gerado');
 
         const redirectUrl = `${process.env.IP_FRONT}?token=${jwtToken}`;
-        console.log('🔄 Redirecionando para:', redirectUrl);
+        console.log(' Redirecionando para:', redirectUrl);
         res.redirect(redirectUrl);
 
     } catch (error) {
-        console.error('❌ Erro:', error);
+        console.error(' Erro:', error);
         res.status(500).send('Erro na autenticação');
     }
 });
@@ -205,6 +233,41 @@ app.post('/login', async (req, res) => {
         );
         res.status(200).json({ message: 'Login bem-sucedido!', token });
     } catch (error) {
+        res.status(500).json({ error: 'Erro no servidor.' });
+    }
+});
+
+app.get('/saldo', authenticateToken, async (req, res) => {
+    console.log(`Recebida requisição de saldo para userId: ${req.userId}`);
+    try {
+        const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
+        if (!usuario) {
+            console.log('Usuário não encontrado.');
+            return res.status(404).json({ error: 'Usuário não encontrado.' });
+        }
+        console.log(`Saldo encontrado: ${usuario.saldo}`);
+        res.json({ saldo: usuario.saldo });
+    } catch (error) {
+        console.error('Erro ao obter saldo:', error);
+        res.status(500).json({ error: 'Erro no servidor.' });
+    }
+});
+
+app.post('/deposito', authenticateToken, async (req, res) => {
+    const { valor } = req.body;
+    console.log(`Recebido depósito: valor = ${valor}, userId = ${req.userId}`);
+
+    if (!valor || valor <= 0) {
+        return res.status(400).json({ error: 'Valor de depósito inválido.' });
+    }
+
+    try {
+        await dbRun('UPDATE users SET saldo = saldo + ? WHERE id = ?', [valor, req.userId]);
+        const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
+        console.log(`Depósito realizado com sucesso: novo saldo = ${usuario.saldo}`);
+        res.json({ message: 'Depósito realizado com sucesso!', saldo: usuario.saldo });
+    } catch (error) {
+        console.error('Erro ao realizar depósito:', error);
         res.status(500).json({ error: 'Erro no servidor.' });
     }
 });

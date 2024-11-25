@@ -7,6 +7,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
     const [autenticado, setAutenticado] = useState(false);
     const [user, setUser] = useState(null);
+    const [token, setToken] = useState(null); // Adicione esta linha
 
     const login = async (email, senha) => {
         try {
@@ -21,9 +22,10 @@ export const AuthProvider = ({ children }) => {
             if (response.ok) {
                 setAutenticado(true);
                 setUser(data.user);
+                setToken(data.token); // Armazena o token
                 return data;
             } else {
-                throw new Error(data.message || 'Login falhou');
+                throw new Error(data.error || 'Login falhou');
             }
         } catch (error) {
             console.error(error);
@@ -31,33 +33,11 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    
-    const loginWithToken = async (token) => {
+    const loginWithToken = async (receivedToken) => {
         try {
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/auth', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-    
-            // Registrar o status da resposta
-            console.log(`Status da Resposta: ${response.status}`);
-    
-            // Registrar o texto bruto da resposta
-            const text = await response.text();
-            console.log('Texto da Resposta:', text);
-    
-            // Tentar analisar o texto como JSON
-            const data = JSON.parse(text);
-    
-            if (response.ok) {
-                setAutenticado(true);
-                setUser(data.user);
-            } else {
-                throw new Error(data.message || 'OAuth Login falhou');
-            }
+            setToken(receivedToken); // Armazena o token
+            setAutenticado(true);
+            // Opcional: buscar dados do usuário usando o token
         } catch (error) {
             console.error('Erro em loginWithToken:', error);
             throw error;
@@ -67,10 +47,11 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setAutenticado(false);
         setUser(null);
+        setToken(null); // Limpa o token ao fazer logout
     };
 
     return (
-        <AuthContext.Provider value={{ autenticado, user, login, loginWithToken, logout }}>
+        <AuthContext.Provider value={{ autenticado, user, token, login, loginWithToken, logout }}>
             {children}
         </AuthContext.Provider>
     );

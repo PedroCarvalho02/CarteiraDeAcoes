@@ -1,13 +1,39 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigation } from '@react-navigation/native';
 
 const HomeView = () => {
+    const { user, token } = useAuth();
+    const [saldo, setSaldo] = useState(0);
+
+    useEffect(() => {
+        const fetchSaldo = async () => {
+            try {
+                const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    setSaldo(data.saldo);
+                } else {
+                    console.error('Erro ao obter saldo:', data.error);
+                }
+            } catch (error) {
+                console.error('Erro ao obter saldo:', error);
+            }
+        };
+
+        if (token) {
+            fetchSaldo();
+        }
+    }, [token]);
+
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Bem-vindo à sua Carteira de Ações!</Text>
-            <Text style={styles.description}>Acesse o menu ao lado para ver as funcionalidades.</Text>
+            <Text style={styles.title}>Bem-vindo, {user?.nome}!</Text>
+            <Text style={styles.description}>Seu saldo atual é: R$ {saldo.toFixed(2)}</Text>
         </View>
     );
 };
