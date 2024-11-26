@@ -1,4 +1,4 @@
-// src/components/Menu/MenuNavigator.js
+
 
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -8,6 +8,7 @@ import DepositoView from '../view/DepositoView';
 import SaqueView from '../view/SaqueView';
 import RentabilidadeView from '../view/RentabilidadeView';
 import Logout from '../view/Logout';
+import NotificationsView from '../view/NotificationsView';
 
 const Drawer = createDrawerNavigator();
 
@@ -38,6 +39,11 @@ const MenuNavigator = () => {
                 name="rentabilidade"
                 component={RentabilidadeView}
                 options={{ headerTitle: 'Rentabilidade' }}
+            />
+            <Drawer.Screen
+                name="notificacoes"
+                component={NotificationsView}
+                options={{ headerTitle: 'Notificações' }}
             />
             <Drawer.Screen
                 name="logout"

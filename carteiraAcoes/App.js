@@ -19,8 +19,8 @@ const linking = {
       deposito: 'deposito',
       saque: 'saque',
       rentabilidade: 'rentabilidade',
+      notifications: 'notifications',
       logout: 'logout',
-      // Adicione outras rotas conforme necessário
     },
   },
 };

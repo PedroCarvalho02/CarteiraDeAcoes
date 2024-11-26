@@ -1,18 +1,32 @@
-// src/components/view/RentabilidadeView.js
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+
+import React, { useState, useCallback } from 'react';
+import {
+    View,
+    Text,
+    FlatList,
+    StyleSheet,
+    ActivityIndicator,
+    Alert,
+    TouchableOpacity,
+    Modal,
+    TextInput,
+} from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
 
 const RentabilidadeView = () => {
-    const { token } = useAuth();
+    const { token, createAlert, fetchAlerts } = useAuth();
     const [acoes, setAcoes] = useState([]);
     const [precos, setPrecos] = useState({});
     const [rentabilidadeTotal, setRentabilidadeTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [alertModalVisible, setAlertModalVisible] = useState(false);
+    const [vendaModalVisible, setVendaModalVisible] = useState(false);
+    const [selectedAcao, setSelectedAcao] = useState(null);
+    const [targetPrice, setTargetPrice] = useState('');
+    const [quantidadeVenda, setQuantidadeVenda] = useState('');
 
     useFocusEffect(
         useCallback(() => {
@@ -28,7 +42,7 @@ const RentabilidadeView = () => {
             calcularRentabilidade();
         } catch (error) {
             console.error('Erro ao atualizar rentabilidade:', error);
-            Alert.alert('Erro', error.message);
+            Alert.alert('Erro', 'Não foi possível atualizar a rentabilidade.');
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -37,50 +51,37 @@ const RentabilidadeView = () => {
 
     const fetchAcoes = async () => {
         try {
-            console.log('Buscando ações do usuário...');
             const response = await fetch('https://hog-chief-visually.ngrok-free.app/minhas-acoes', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Erro ao obter ações do usuário.');
-            }
-
             const data = await response.json();
-            console.log('Ações recebidas:', data.acoes);
-            setAcoes(data.acoes);
+            if (response.ok) {
+                setAcoes(data.acoes);
+            } else {
+                throw new Error(data.error || 'Erro ao obter ações do usuário.');
+            }
         } catch (error) {
             console.error('Erro ao buscar ações:', error);
             Alert.alert('Erro', error.message);
-            throw error; // Propagar o erro para ser tratado na função chamada
         }
     };
 
     const fetchPrecos = async () => {
-        if (acoes.length === 0) {
-            console.log('Nenhuma ação para buscar preços.');
-            return;
-        }
-
-        const simbolos = acoes.map(acao => acao.simbolo).join(',');
         try {
-            console.log(`Buscando preços para símbolos: ${simbolos}`);
-            const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolos}`, {
+            if (acoes.length === 0) return;
+            const symbols = acoes.map(acao => acao.simbolo).join(',');
+            const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${symbols}`, {
                 headers: {
                     'Accept': 'application/json',
                 },
             });
-
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Erro ao obter preços das ações.');
             }
-
             const data = await response.json();
-            console.log('Preços recebidos:', data);
             const precosMap = {};
             data.forEach(item => {
                 precosMap[item.symbol] = item.c;
@@ -89,7 +90,6 @@ const RentabilidadeView = () => {
         } catch (error) {
             console.error('Erro ao buscar preços:', error);
             Alert.alert('Erro', error.message);
-            throw error; // Propagar o erro para ser tratado na função chamada
         }
     };
 
@@ -101,82 +101,102 @@ const RentabilidadeView = () => {
             total += lucro;
         });
         setRentabilidadeTotal(total);
-        console.log(`Rentabilidade total calculada: R$ ${total.toFixed(2)}`);
     };
-    const handleVender = (acao) => {
-        Alert.prompt(
-            'Vender Ação',
-            `Quantas ações de ${acao.simbolo} deseja vender?`,
-            async (quantidade) => {
-                const qty = parseInt(quantidade);
-                if (isNaN(qty) || qty <= 0) {
-                    Alert.alert('Erro', 'Por favor, insira uma quantidade válida.');
-                    return;
-                }
-                if (qty > acao.quantidade) {
-                    Alert.alert('Erro', 'Você não possui essa quantidade de ações para vender.');
-                    return;
-                }
-    
-                try {
-                    const response = await fetch('https://hog-chief-visually.ngrok-free.app/vender', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({ simbolo: acao.simbolo, quantidade: qty }),
-                    });
-    
-                    const data = await response.json();
-    
-                    if (response.ok) {
-                        Alert.alert('Sucesso', `Vendida(s) ${qty} ação(ões) de ${acao.simbolo}.`);
-                        // Atualizar rentabilidade e saldo
-                        await atualizarRentabilidade();
-                    } else {
-                        Alert.alert('Erro', data.error || 'Não foi possível realizar a venda.');
-                    }
-                } catch (error) {
-                    console.error('Erro ao vender ação:', error);
-                    Alert.alert('Erro', 'Ocorreu um erro ao realizar a venda.');
-                }
+
+    const openAlertModal = (acao) => {
+        setSelectedAcao(acao);
+        setAlertModalVisible(true);
+    };
+
+    const closeAlertModal = () => {
+        setSelectedAcao(null);
+        setTargetPrice('');
+        setAlertModalVisible(false);
+    };
+
+    const openVendaModal = (acao) => {
+        setSelectedAcao(acao);
+        setQuantidadeVenda('');
+        setVendaModalVisible(true);
+    };
+
+    const closeVendaModal = () => {
+        setSelectedAcao(null);
+        setQuantidadeVenda('');
+        setVendaModalVisible(false);
+    };
+
+    const saveAlert = async () => {
+        if (!targetPrice || isNaN(parseFloat(targetPrice)) || parseFloat(targetPrice) <= 0) {
+            Alert.alert('Erro', 'Por favor, insira um preço-alvo válido.');
+            return;
+        }
+        try {
+            await createAlert(selectedAcao.simbolo, parseFloat(targetPrice));
+            Alert.alert('Sucesso', 'Alerta criado com sucesso!');
+            fetchAlerts();
+            closeAlertModal();
+        } catch (error) {
+            Alert.alert('Erro', error.message);
+        }
+    };
+
+    const handleVender = async () => {
+        const quantidade = parseInt(quantidadeVenda);
+        if (isNaN(quantidade) || quantidade <= 0) {
+            Alert.alert('Erro', 'Por favor, insira uma quantidade válida.');
+            return;
+        }
+
+        try {
+            const response = await fetch('https://hog-chief-visually.ngrok-free.app/vender', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    simbolo: selectedAcao.simbolo,
+                    quantidade: quantidade,
+                }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                Alert.alert('Sucesso', data.message);
+                atualizarRentabilidade();
+                closeVendaModal();
+            } else {
+                throw new Error(data.error || 'Erro ao vender ações.');
             }
-        );
+        } catch (error) {
+            console.error('Erro ao vender ações:', error);
+            Alert.alert('Erro', error.message);
+        }
     };
 
     const renderItem = ({ item }) => {
         const precoAtual = precos[item.simbolo] || 0;
         const rentabilidade = (precoAtual - item.preco_compra) * item.quantidade;
-    
         return (
             <View style={styles.itemContainer}>
                 <View>
-                    <Text style={styles.simbolo}>{item.simbolo}</Text>
-                    <Text style={styles.detalhes}>Quantidade: {item.quantidade}</Text>
-                    <Text style={styles.detalhes}>Preço Compra: R$ {item.preco_compra.toFixed(2)}</Text>
-                    <Text style={styles.detalhes}>Preço Atual: R$ {precoAtual.toFixed(2)}</Text>
-                    <Text
-                        style={[
-                            styles.rentabilidade,
-                            rentabilidade >= 0
-                                ? styles.rentabilidadePositiva
-                                : styles.rentabilidadeNegativa,
-                        ]}
-                    >
+                    <Text style={styles.nomeAcao}>{item.simbolo} - {item.nome}</Text>
+                    <Text style={styles.detalhesAcao}>Preço Atual: R$ {precoAtual.toFixed(2)}</Text>
+                    <Text style={styles.detalhesAcao}>Quantidade: {item.quantidade}</Text>
+                    <Text style={styles.rentabilidade}>
                         Rentabilidade: R$ {rentabilidade.toFixed(2)}
                     </Text>
                 </View>
-                <TouchableOpacity style={styles.botaoVender} onPress={() => handleVender(item)}>
-                    <Text style={styles.textoBotao}>Vender</Text>
-                </TouchableOpacity>
+                <View style={styles.botoesContainer}>
+                    <TouchableOpacity style={styles.botaoAlerta} onPress={() => openAlertModal(item)}>
+                        <Text style={styles.textoBotao}>Definir Alerta</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.botaoVender} onPress={() => openVendaModal(item)}>
+                        <Text style={styles.textoBotao}>Vender</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         );
-    };
-
-    const handleRefresh = () => {
-        setIsRefreshing(true);
-        atualizarRentabilidade();
     };
 
     if (isLoading) {
@@ -195,18 +215,68 @@ const RentabilidadeView = () => {
                 Rentabilidade Total: R$ {rentabilidadeTotal.toFixed(2)}
             </Text>
 
-            <TouchableOpacity style={styles.botaoAtualizar} onPress={handleRefresh}>
-                <Text style={styles.textoBotaoAtualizar}>Atualizar Rentabilidade</Text>
-            </TouchableOpacity>
-
             <FlatList
                 data={acoes}
-                keyExtractor={(item) => item.id.toString()} // Agora 'id' está definido
+                keyExtractor={(item) => item.id.toString()}
                 renderItem={renderItem}
                 ListEmptyComponent={<Text style={styles.emptyText}>Você não possui ações.</Text>}
                 refreshing={isRefreshing}
-                onRefresh={handleRefresh}
+                onRefresh={atualizarRentabilidade}
             />
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={alertModalVisible}
+                onRequestClose={closeAlertModal}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Definir Alerta para {selectedAcao?.simbolo}</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Preço Alvo (R$)"
+                            keyboardType="numeric"
+                            value={targetPrice}
+                            onChangeText={setTargetPrice}
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.botaoSalvar} onPress={saveAlert}>
+                                <Text style={styles.textoBotao}>Salvar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.botaoCancelar} onPress={closeAlertModal}>
+                                <Text style={styles.textoBotao}>Cancelar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={vendaModalVisible}
+                onRequestClose={closeVendaModal}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Vender {selectedAcao?.simbolo}</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Quantidade"
+                            keyboardType="numeric"
+                            value={quantidadeVenda}
+                            onChangeText={setQuantidadeVenda}
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.botaoSalvar} onPress={handleVender}>
+                                <Text style={styles.textoBotao}>Vender</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.botaoCancelar} onPress={closeVendaModal}>
+                                <Text style={styles.textoBotao}>Cancelar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -220,75 +290,101 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        marginBottom: 20,
-        textAlign: 'center',
+        marginBottom: 10,
     },
     total: {
         fontSize: 18,
-        fontWeight: 'bold',
         marginBottom: 20,
-        textAlign: 'center',
-        color: '#333',
-    },
-    botaoAtualizar: {
-        backgroundColor: '#6200ee',
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-        borderRadius: 5,
-        alignSelf: 'center',
-        marginBottom: 20,
-    },
-    botaoVender: {
-        backgroundColor: '#dc3545',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 5,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    textoBotao: {
-        color: '#fff',
-        fontSize: 16,
-    },
-    textoBotaoAtualizar: {
-        color: '#fff',
-        fontSize: 16,
     },
     itemContainer: {
         backgroundColor: '#fff',
         padding: 15,
-        borderRadius: 10,
         marginBottom: 10,
-        elevation: 2,
+        borderRadius: 5,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
-    simbolo: {
+    botoesContainer: {
+        flexDirection: 'column',
+    },
+    nomeAcao: {
         fontSize: 18,
         fontWeight: 'bold',
     },
-    detalhes: {
-        fontSize: 14,
+    detalhesAcao: {
+        fontSize: 16,
         color: '#555',
     },
     rentabilidade: {
         fontSize: 16,
-        marginTop: 5,
+        color: '#008000',
     },
-    rentabilidadePositiva: {
-        color: '#28a745',
+    botaoAlerta: {
+        backgroundColor: '#6200ee',
+        padding: 10,
+        borderRadius: 5,
+        marginBottom: 5,
     },
-    rentabilidadeNegativa: {
-        color: '#dc3545',
+    botaoVender: {
+        backgroundColor: '#ff3b30',
+        padding: 10,
+        borderRadius: 5,
     },
-    emptyText: {
+    textoBotao: {
+        color: '#fff',
+        fontWeight: 'bold',
         textAlign: 'center',
-        marginTop: 20,
-        fontSize: 16,
-        color: '#555',
     },
     loadingText: {
         marginTop: 10,
         textAlign: 'center',
         color: '#555',
+    },
+    emptyText: {
+        textAlign: 'center',
+        marginTop: 20,
+        color: '#555',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        margin: 20,
+        padding: 20,
+        borderRadius: 10,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    input: {
+        borderBottomWidth: 1,
+        borderColor: '#ccc',
+        marginBottom: 20,
+        paddingVertical: 5,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    botaoSalvar: {
+        backgroundColor: '#6200ee',
+        padding: 10,
+        borderRadius: 5,
+        flex: 1,
+        marginRight: 5,
+    },
+    botaoCancelar: {
+        backgroundColor: '#aaa',
+        padding: 10,
+        borderRadius: 5,
+        flex: 1,
+        marginLeft: 5,
     },
 });
 

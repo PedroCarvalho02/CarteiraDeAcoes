@@ -1,4 +1,4 @@
-// src/components/view/DepositoView.js
+
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 
 const DepositoView = () => {
-    const { token } = useAuth(); 
+    const { token } = useAuth();
     const [depositValue, setDepositValue] = useState('');
     const [saldo, setSaldo] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +61,7 @@ const DepositoView = () => {
             if (response.ok) {
                 Alert.alert('Sucesso', data.message || 'Depósito realizado com sucesso!');
                 setDepositValue('');
-                setSaldo(data.saldo); // Atualiza o saldo localmente
+                setSaldo(data.saldo);
             } else {
                 throw new Error(data.error || 'Erro ao realizar o depósito.');
             }

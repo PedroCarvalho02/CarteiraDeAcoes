@@ -1,24 +1,23 @@
-// src/components/view/AcoesView.js
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    View, 
-    Text, 
-    FlatList, 
-    StyleSheet, 
-    ActivityIndicator, 
-    Alert, 
-    TouchableOpacity 
+import {
+    View,
+    Text,
+    FlatList,
+    StyleSheet,
+    ActivityIndicator,
+    Alert,
+    TouchableOpacity
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 
-const AcoesView = () => {
+const AcoesView = ({ navigation }) => {
     const { token } = useAuth();
     const [acoes, setAcoes] = useState([
         { id: '1', nome: 'Apple Inc.', simbolo: 'AAPL' },
         { id: '2', nome: 'Microsoft Corporation', simbolo: 'MSFT' },
-        // ... outras ações
+        
     ]);
     const [precos, setPrecos] = useState({});
     const [saldo, setSaldo] = useState(0);
@@ -120,6 +119,10 @@ const AcoesView = () => {
         );
     };
 
+    const handleConfigurarAlerta = (acao) => {
+        navigation.navigate('ConfigurarAlerta', { acao });
+    };
+
     const renderItem = ({ item }) => (
         <View style={styles.itemContainer}>
             <View>
@@ -128,9 +131,14 @@ const AcoesView = () => {
                     {item.simbolo} - ${precos[item.simbolo]?.toFixed(2) || 'Carregando...'}
                 </Text>
             </View>
-            <TouchableOpacity style={styles.botaoComprar} onPress={() => handleComprar(item)}>
-                <Text style={styles.textoBotao}>Comprar</Text>
-            </TouchableOpacity>
+            <View style={styles.botoesContainer}>
+                <TouchableOpacity style={styles.botaoComprar} onPress={() => handleComprar(item)}>
+                    <Text style={styles.textoBotao}>Comprar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.botaoAlerta} onPress={() => handleConfigurarAlerta(item)}>
+                    <Text style={styles.textoBotao}>Alerta</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 
@@ -138,7 +146,7 @@ const AcoesView = () => {
         return (
             <View style={styles.container}>
                 <ActivityIndicator size="large" color="#6200ee" />
-                <Text style={styles.loadingText}>Carregando saldo...</Text>
+                <Text style={styles.loadingText}>Carregando...</Text>
             </View>
         );
     }

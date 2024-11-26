@@ -8,7 +8,6 @@ const { promisify } = require('util');
 const { OAuth2Client } = require('google-auth-library');
 const finnhub = require('finnhub');
 
-
 require('dotenv').config();
 
 const PORT = process.env.PORT || 3000;
@@ -30,7 +29,6 @@ const db = new sqlite3.Database('./banco.db', (err) => {
     }
 });
 
-// Verifica e adiciona a coluna googleId se necessário
 db.serialize(() => {
     db.all("PRAGMA table_info(users);", (err, columns) => {
         if (err) {
@@ -76,6 +74,21 @@ db.run(`CREATE TABLE IF NOT EXISTS user_acoes (
         console.error('Erro ao criar a tabela user_acoes:', err.message);
     } else {
         console.log('Tabela user_acoes pronta.');
+    }
+});
+
+db.run(`CREATE TABLE IF NOT EXISTS alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    simbolo TEXT NOT NULL,
+    target_price REAL NOT NULL,
+    triggered INTEGER DEFAULT 0,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)`, (err) => {
+    if (err) {
+        console.error('Erro ao criar a tabela alerts:', err.message);
+    } else {
+        console.log('Tabela alerts pronta.');
     }
 });
 
@@ -352,7 +365,6 @@ app.post('/comprar', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Obter o preço atual da ação
         const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`);
         if (!response.ok) {
             const errorData = await response.json();
@@ -366,7 +378,6 @@ app.post('/comprar', authenticateToken, async (req, res) => {
 
         const totalCompra = quantidade * precoAtual;
 
-        // Verificar saldo do usuário
         const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
         if (!usuario) {
             return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -375,31 +386,25 @@ app.post('/comprar', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Saldo insuficiente para realizar a compra.' });
         }
 
-        // Verificar se o usuário já possui a ação
         const acaoExistente = await dbGet('SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?', [userId, simbolo]);
 
         if (acaoExistente) {
-            // Calcular novo preço médio
             const novaQuantidade = acaoExistente.quantidade + quantidade;
             const novoPrecoCompra = ((acaoExistente.quantidade * acaoExistente.preco_compra) + (quantidade * precoAtual)) / novaQuantidade;
 
-            // Atualizar a ação existente
             await dbRun(
                 'UPDATE user_acoes SET quantidade = ?, preco_compra = ? WHERE id = ?',
                 [novaQuantidade, novoPrecoCompra, acaoExistente.id]
             );
         } else {
-            // Inserir nova ação
             await dbRun(
                 'INSERT INTO user_acoes (user_id, simbolo, quantidade, preco_compra) VALUES (?, ?, ?, ?)',
                 [userId, simbolo, quantidade, precoAtual]
             );
         }
 
-        // Deduzir o saldo do usuário
         await dbRun('UPDATE users SET saldo = saldo - ? WHERE id = ?', [totalCompra, userId]);
 
-        // Obter o novo saldo
         const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
 
         res.json({ message: `Compradas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(2)} cada.`, saldo: novoSaldo.saldo });
@@ -443,7 +448,6 @@ app.post('/vender', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Verificar se o usuário possui a ação e a quantidade suficiente
         const acaoExistente = await dbGet(
             'SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?',
             [userId, simbolo]
@@ -453,7 +457,6 @@ app.post('/vender', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Quantidade insuficiente de ações para venda.' });
         }
 
-        // Obter o preço atual da ação
         const response = await fetch(
             `https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`
         );
@@ -469,7 +472,6 @@ app.post('/vender', authenticateToken, async (req, res) => {
 
         const totalVenda = quantidade * precoAtual;
 
-        // Atualizar a quantidade de ações do usuário
         const novaQuantidade = acaoExistente.quantidade - quantidade;
         if (novaQuantidade > 0) {
             await dbRun(
@@ -480,10 +482,8 @@ app.post('/vender', authenticateToken, async (req, res) => {
             await dbRun('DELETE FROM user_acoes WHERE id = ?', [acaoExistente.id]);
         }
 
-        // Atualizar o saldo do usuário
         await dbRun('UPDATE users SET saldo = saldo + ? WHERE id = ?', [totalVenda, userId]);
 
-        // Obter o novo saldo
         const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
 
         res.json({
@@ -498,6 +498,169 @@ app.post('/vender', authenticateToken, async (req, res) => {
     }
 });
 
+app.post('/alerts', authenticateToken, async (req, res) => {
+    const { simbolo, target_price } = req.body;
+    const userId = req.userId;
+
+    if (!simbolo || !target_price || target_price <= 0) {
+        return res.status(400).json({ error: 'Símbolo e preço-alvo válidos são necessários.' });
+    }
+
+    try {
+        await dbRun(
+            'INSERT INTO alerts (user_id, simbolo, target_price) VALUES (?, ?, ?)',
+            [userId, simbolo, target_price]
+        );
+
+        res.status(201).json({ message: 'Alerta criado com sucesso!' });
+    } catch (error) {
+        console.error('Erro ao criar alerta:', error);
+        res.status(500).json({ error: 'Erro ao criar alerta.' });
+    }
+});
+
+
+app.get('/alerts', authenticateToken, async (req, res) => {
+    const userId = req.userId;
+
+    try {
+        const alerts = await new Promise((resolve, reject) => {
+            db.all(
+                'SELECT id, simbolo, target_price, triggered FROM alerts WHERE user_id = ?',
+                [userId],
+                (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows);
+                    }
+                }
+            );
+        });
+        res.json({ alerts });
+    } catch (error) {
+        console.error('Erro ao listar alertas:', error);
+        res.status(500).json({ error: 'Erro ao listar alertas.' });
+    }
+});
+
+
+app.delete('/alerts/:id', authenticateToken, async (req, res) => {
+    const userId = req.userId;
+    const alertId = req.params.id;
+
+    try {
+        const alert = await dbGet('SELECT * FROM alerts WHERE id = ? AND user_id = ?', [alertId, userId]);
+        if (!alert) {
+            return res.status(404).json({ error: 'Alerta não encontrado.' });
+        }
+
+        await dbRun('DELETE FROM alerts WHERE id = ?', [alertId]);
+        res.json({ message: 'Alerta removido com sucesso!' });
+    } catch (error) {
+        console.error('Erro ao remover alerta:', error);
+        res.status(500).json({ error: 'Erro ao remover alerta.' });
+    }
+});
+
+const checkAlerts = async () => {
+    try {
+        const alerts = await new Promise((resolve, reject) => {
+            db.all('SELECT a.id, a.user_id, a.simbolo, a.target_price FROM alerts a WHERE a.triggered = 0', [], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+
+        if (alerts.length === 0) {
+            console.log('Nenhum alerta para verificar.');
+            return;
+        }
+
+        const symbols = [...new Set(alerts.map(alert => alert.simbolo))].join(',');
+        const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${symbols}`);
+        if (!response.ok) {
+            throw new Error('Erro ao buscar preços das ações para verificação de alertas.');
+        }
+        const pricesData = await response.json();
+        const pricesMap = {};
+        pricesData.forEach(item => {
+            pricesMap[item.symbol] = item.c;
+        });
+
+        for (const alert of alerts) {
+            const currentPrice = pricesMap[alert.simbolo];
+            if (currentPrice && currentPrice > alert.target_price) {
+                console.log(`Alerta disparado para userId ${alert.user_id}: ${alert.simbolo} atingiu R$ ${currentPrice}`);
+                await dbRun('UPDATE alerts SET triggered = 1 WHERE id = ?', [alert.id]);
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao verificar alertas:', error);
+    }
+};
+setInterval(checkAlerts, 60000);
+
+app.post('/vender', authenticateToken, async (req, res) => {
+    const { simbolo, quantidade } = req.body;
+    const userId = req.userId;
+
+   
+    if (!simbolo || !quantidade || quantidade <= 0) {
+        return res.status(400).json({ error: 'Símbolo e quantidade válidos são necessários.' });
+    }
+
+    try {
+        
+        const acaoExistente = await dbGet(
+            'SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?',
+            [userId, simbolo]
+        );
+
+        if (!acaoExistente || acaoExistente.quantidade < quantidade) {
+            return res.status(400).json({ error: 'Quantidade insuficiente de ações para venda.' });
+        }
+
+        const response = await fetch(
+            `https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`
+        );
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao obter preço da ação.');
+        }
+        const data = await response.json();
+        if (data.length === 0 || !data[0].c) {
+            throw new Error('Preço da ação não encontrado.');
+        }
+        const precoAtual = data[0].c;
+
+        const totalVenda = quantidade * precoAtual;
+
+        const novaQuantidade = acaoExistente.quantidade - quantidade;
+        if (novaQuantidade > 0) {
+            await dbRun(
+                'UPDATE user_acoes SET quantidade = ? WHERE id = ?',
+                [novaQuantidade, acaoExistente.id]
+            );
+        } else {
+            await dbRun('DELETE FROM user_acoes WHERE id = ?', [acaoExistente.id]);
+        }
+        await dbRun('UPDATE users SET saldo = saldo + ? WHERE id = ?', [totalVenda, userId]);
+
+        const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
+
+        res.json({
+            message: `Vendidas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(2)} cada.`,
+            saldo: novoSaldo.saldo,
+        });
+    } catch (error) {
+        console.error('Erro ao vender ação:', error);
+        res.status(500).json({ error: error.message || 'Erro ao realizar a venda.' });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

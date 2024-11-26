@@ -1,4 +1,4 @@
-// src/components/view/HomeView.js
+
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
