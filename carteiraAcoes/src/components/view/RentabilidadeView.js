@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 const RentabilidadeView = () => {
     const { token } = useAuth();
@@ -12,9 +14,11 @@ const RentabilidadeView = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    useEffect(() => {
-        atualizarRentabilidade();
-    }, [token]);
+    useFocusEffect(
+        useCallback(() => {
+            atualizarRentabilidade();
+        }, [token])
+    );
 
     const atualizarRentabilidade = async () => {
         setIsLoading(true);
@@ -99,11 +103,52 @@ const RentabilidadeView = () => {
         setRentabilidadeTotal(total);
         console.log(`Rentabilidade total calculada: R$ ${total.toFixed(2)}`);
     };
+    const handleVender = (acao) => {
+        Alert.prompt(
+            'Vender Ação',
+            `Quantas ações de ${acao.simbolo} deseja vender?`,
+            async (quantidade) => {
+                const qty = parseInt(quantidade);
+                if (isNaN(qty) || qty <= 0) {
+                    Alert.alert('Erro', 'Por favor, insira uma quantidade válida.');
+                    return;
+                }
+                if (qty > acao.quantidade) {
+                    Alert.alert('Erro', 'Você não possui essa quantidade de ações para vender.');
+                    return;
+                }
+    
+                try {
+                    const response = await fetch('https://hog-chief-visually.ngrok-free.app/vender', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({ simbolo: acao.simbolo, quantidade: qty }),
+                    });
+    
+                    const data = await response.json();
+    
+                    if (response.ok) {
+                        Alert.alert('Sucesso', `Vendida(s) ${qty} ação(ões) de ${acao.simbolo}.`);
+                        // Atualizar rentabilidade e saldo
+                        await atualizarRentabilidade();
+                    } else {
+                        Alert.alert('Erro', data.error || 'Não foi possível realizar a venda.');
+                    }
+                } catch (error) {
+                    console.error('Erro ao vender ação:', error);
+                    Alert.alert('Erro', 'Ocorreu um erro ao realizar a venda.');
+                }
+            }
+        );
+    };
 
     const renderItem = ({ item }) => {
         const precoAtual = precos[item.simbolo] || 0;
         const rentabilidade = (precoAtual - item.preco_compra) * item.quantidade;
-
+    
         return (
             <View style={styles.itemContainer}>
                 <View>
@@ -111,13 +156,20 @@ const RentabilidadeView = () => {
                     <Text style={styles.detalhes}>Quantidade: {item.quantidade}</Text>
                     <Text style={styles.detalhes}>Preço Compra: R$ {item.preco_compra.toFixed(2)}</Text>
                     <Text style={styles.detalhes}>Preço Atual: R$ {precoAtual.toFixed(2)}</Text>
-                    <Text style={[
-                        styles.rentabilidade, 
-                        rentabilidade >= 0 ? styles.rentabilidadePositiva : styles.rentabilidadeNegativa
-                    ]}>
+                    <Text
+                        style={[
+                            styles.rentabilidade,
+                            rentabilidade >= 0
+                                ? styles.rentabilidadePositiva
+                                : styles.rentabilidadeNegativa,
+                        ]}
+                    >
                         Rentabilidade: R$ {rentabilidade.toFixed(2)}
                     </Text>
                 </View>
+                <TouchableOpacity style={styles.botaoVender} onPress={() => handleVender(item)}>
+                    <Text style={styles.textoBotao}>Vender</Text>
+                </TouchableOpacity>
             </View>
         );
     };
@@ -185,6 +237,18 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         alignSelf: 'center',
         marginBottom: 20,
+    },
+    botaoVender: {
+        backgroundColor: '#dc3545',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 5,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    textoBotao: {
+        color: '#fff',
+        fontSize: 16,
     },
     textoBotaoAtualizar: {
         color: '#fff',

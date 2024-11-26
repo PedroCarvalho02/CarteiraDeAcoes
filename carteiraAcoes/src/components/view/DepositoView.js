@@ -1,78 +1,106 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+// src/components/view/DepositoView.js
+
+import React, { useState, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 const DepositoView = () => {
     const { token } = useAuth(); 
-    const [depositValue, setDepositValue] = useState(0);
+    const [depositValue, setDepositValue] = useState('');
     const [saldo, setSaldo] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        const fetchSaldo = async () => {
-            try {
-                const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    setSaldo(data.saldo);
-                } else {
-                    console.error('Erro ao obter saldo:', data.error);
-                }
-            } catch (error) {
-                console.error('Erro ao obter saldo:', error);
+    const fetchSaldo = async () => {
+        try {
+            setIsLoading(true);
+            const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setSaldo(data.saldo);
+            } else {
+                throw new Error(data.error || 'Erro ao obter saldo.');
             }
-        };
-
-        if (token) { 
-            fetchSaldo();
+        } catch (error) {
+            console.error('Erro ao buscar saldo:', error);
+            Alert.alert('Erro', error.message);
+        } finally {
+            setIsLoading(false);
         }
-    }, [token]);
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchSaldo();
+        }, [token])
+    );
 
     const handleSubmit = async () => {
+        const valorNumerico = parseFloat(depositValue);
+
+        if (isNaN(valorNumerico) || valorNumerico <= 0) {
+            Alert.alert('Erro', 'Por favor, insira um valor válido para depósito.');
+            return;
+        }
+
         try {
+            setIsLoading(true);
             const response = await fetch('https://hog-chief-visually.ngrok-free.app/deposito', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({ valor: depositValue }),
+                body: JSON.stringify({ valor: valorNumerico }),
             });
             const data = await response.json();
             if (response.ok) {
-                Alert.alert('Sucesso', data.message);
-                setSaldo(data.saldo);
+                Alert.alert('Sucesso', data.message || 'Depósito realizado com sucesso!');
+                setDepositValue('');
+                setSaldo(data.saldo); // Atualiza o saldo localmente
             } else {
-                Alert.alert('Erro', data.error);
+                throw new Error(data.error || 'Erro ao realizar o depósito.');
             }
         } catch (error) {
             console.error('Erro ao realizar depósito:', error);
-            Alert.alert('Erro', 'Não foi possível realizar o depósito.');
+            Alert.alert('Erro', error.message);
+        } finally {
+            setIsLoading(false);
         }
     };
+
+    if (isLoading) {
+        return (
+            <View style={styles.container}>
+                <ActivityIndicator size="large" color="#6200ee" />
+                <Text style={styles.loadingText}>Processando...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Depósito</Text>
-            <Text style={styles.saldo}>Saldo atual: R$ {saldo.toFixed(2)}</Text>
-            <View style={styles.form}>
-                <Text style={styles.label}>Valor do Depósito:</Text>
-                <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    value={String(depositValue)}
-                    onChangeText={text => setDepositValue(Number(text))}
-                    required
-                />
-                <Button title="Depositar" onPress={handleSubmit} />
-            </View>
+            <Text style={styles.saldo}>Saldo Atual: R$ {saldo.toFixed(2)}</Text>
+
+            <TextInput
+                style={styles.input}
+                placeholder="Valor para depósito"
+                keyboardType="numeric"
+                value={depositValue}
+                onChangeText={text => setDepositValue(text)}
+            />
+
+            <TouchableOpacity style={styles.botao} onPress={handleSubmit}>
+                <Text style={styles.textoBotao}>Realizar Depósito</Text>
+            </TouchableOpacity>
         </View>
     );
 };
-
 
 const styles = StyleSheet.create({
     container: {
@@ -87,23 +115,35 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         textAlign: 'center',
     },
-    form: {
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
-        elevation: 2,
-    },
-    label: {
-        fontSize: 16,
-        marginBottom: 10,
+    saldo: {
+        fontSize: 18,
+        marginBottom: 20,
+        textAlign: 'center',
     },
     input: {
-        height: 40,
-        borderColor: '#ccc',
+        height: 50,
+        borderColor: '#6200ee',
         borderWidth: 1,
         borderRadius: 5,
         paddingHorizontal: 10,
         marginBottom: 20,
+        backgroundColor: '#fff',
+    },
+    botao: {
+        backgroundColor: '#6200ee',
+        paddingVertical: 15,
+        borderRadius: 5,
+        alignItems: 'center',
+    },
+    textoBotao: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    loadingText: {
+        marginTop: 10,
+        textAlign: 'center',
+        color: '#555',
     },
 });
 

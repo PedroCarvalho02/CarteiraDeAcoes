@@ -1,6 +1,6 @@
-// SaqueView.js
+// src/components/view/SaqueView.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     View, 
     Text, 
@@ -11,16 +11,13 @@ import {
     ActivityIndicator 
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 const SaqueView = () => {
     const { token } = useAuth();
     const [withdrawValue, setWithdrawValue] = useState('');
     const [saldo, setSaldo] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        fetchSaldo();
-    }, [token]);
 
     const fetchSaldo = async () => {
         try {
@@ -45,6 +42,12 @@ const SaqueView = () => {
             setIsLoading(false);
         }
     };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchSaldo();
+        }, [token])
+    );
 
     const handleSaque = async () => {
         const valorNumerico = parseFloat(withdrawValue);

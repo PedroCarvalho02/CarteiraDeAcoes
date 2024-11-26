@@ -28,3 +28,6 @@ const acoes = [
     { id: '27', nome: 'Broadcom Inc.', simbolo: 'AVGO' },
     { id: '28', nome: 'Qualcomm Incorporated', simbolo: 'QCOM' },
 ];
+
+
+ngrok http --url=hog-chief-visually.ngrok-free.app 80

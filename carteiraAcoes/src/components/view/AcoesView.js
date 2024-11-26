@@ -1,83 +1,87 @@
 // src/components/view/AcoesView.js
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+    View, 
+    Text, 
+    FlatList, 
+    StyleSheet, 
+    ActivityIndicator, 
+    Alert, 
+    TouchableOpacity 
+} from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 const AcoesView = () => {
     const { token } = useAuth();
-    const [saldo, setSaldo] = useState(0);
-    const [precos, setPrecos] = useState({});
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchSaldo = async () => {
-            try {
-                if (!token) {
-                    console.warn('Token não disponível.');
-                    setIsLoading(false);
-                    return;
-                }
-
-                const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Erro ao obter saldo.');
-                }
-
-                const data = await response.json();
-                setSaldo(data.saldo);
-            } catch (error) {
-                console.error('Erro ao obter saldo:', error);
-                Alert.alert('Erro', 'Não foi possível obter o saldo.');
-            }
-        };
-
-        const fetchPrecos = async () => {
-            try {
-                const symbols = acoes.map(acao => acao.simbolo).join(',');
-                const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${symbols}`, {
-                    headers: {
-                        'Accept': 'application/json',
-                    },
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Erro ao obter preços das ações.');
-                }
-
-                const data = await response.json();
-                const precosMap = {};
-                data.forEach(item => {
-                    precosMap[item.symbol] = item.c;
-                });
-                setPrecos(precosMap);
-            } catch (error) {
-                console.error('Erro ao buscar preços das ações:', error);
-                Alert.alert('Erro', 'Não foi possível obter os preços das ações.');
-            }
-        };
-
-        const inicializar = async () => {
-            await fetchSaldo();
-            await fetchPrecos();
-            setIsLoading(false);
-        };
-
-        inicializar();
-    }, [token]);
-
-    const acoes = [
+    const [acoes, setAcoes] = useState([
         { id: '1', nome: 'Apple Inc.', simbolo: 'AAPL' },
         { id: '2', nome: 'Microsoft Corporation', simbolo: 'MSFT' },
         // ... outras ações
-    ];
+    ]);
+    const [precos, setPrecos] = useState({});
+    const [saldo, setSaldo] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchSaldo = async () => {
+        try {
+            setIsLoading(true);
+            const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setSaldo(data.saldo);
+            } else {
+                throw new Error(data.error || 'Erro ao obter saldo.');
+            }
+        } catch (error) {
+            console.error('Erro ao obter saldo:', error);
+            Alert.alert('Erro', error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchPrecos = async () => {
+        try {
+            const symbols = acoes.map(acao => acao.simbolo).join(',');
+            const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${symbols}`, {
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erro ao obter preços das ações.');
+            }
+
+            const data = await response.json();
+            const precosMap = {};
+            data.forEach(item => {
+                precosMap[item.symbol] = item.c;
+            });
+            setPrecos(precosMap);
+        } catch (error) {
+            console.error('Erro ao buscar preços das ações:', error);
+            Alert.alert('Erro', error.message);
+        }
+    };
+
+    const inicializar = async () => {
+        await fetchSaldo();
+        await fetchPrecos();
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            inicializar();
+        }, [token])
+    );
 
     const handleComprar = async (acao) => {
         Alert.prompt(
@@ -104,7 +108,6 @@ const AcoesView = () => {
 
                     if (response.ok) {
                         Alert.alert('Sucesso', `Comprada(s) ${qty} ação(ões) de ${acao.nome}.`);
-                        // Atualizar saldo após compra
                         setSaldo(data.saldo);
                     } else {
                         Alert.alert('Erro', data.error || 'Não foi possível realizar a compra.');
@@ -134,7 +137,8 @@ const AcoesView = () => {
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <Text style={styles.saldo}>Carregando saldo...</Text>
+                <ActivityIndicator size="large" color="#6200ee" />
+                <Text style={styles.loadingText}>Carregando saldo...</Text>
             </View>
         );
     }
@@ -154,23 +158,23 @@ const AcoesView = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
-        paddingTop: 10,
-        paddingHorizontal: 20,
+        padding: 20,
+        backgroundColor: '#f5f5f5',
+        justifyContent: 'center',
     },
     saldo: {
         fontSize: 18,
-        fontWeight: 'bold',
+        marginBottom: 20,
         textAlign: 'center',
-        marginBottom: 10,
     },
     itemContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        backgroundColor: '#fff',
         padding: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        borderRadius: 10,
+        marginBottom: 10,
+        elevation: 2,
     },
     nomeAcao: {
         fontSize: 18,
@@ -182,13 +186,19 @@ const styles = StyleSheet.create({
     },
     botaoComprar: {
         backgroundColor: '#6200ee',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 15,
         borderRadius: 5,
+        justifyContent: 'center',
     },
     textoBotao: {
         color: '#fff',
         fontSize: 16,
+    },
+    loadingText: {
+        marginTop: 10,
+        textAlign: 'center',
+        color: '#555',
     },
 });
 

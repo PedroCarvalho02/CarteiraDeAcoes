@@ -434,6 +434,70 @@ app.get('/minhas-acoes', authenticateToken, async (req, res) => {
     }
 });
 
+app.post('/vender', authenticateToken, async (req, res) => {
+    const { simbolo, quantidade } = req.body;
+    const userId = req.userId;
+
+    if (!simbolo || !quantidade || quantidade <= 0) {
+        return res.status(400).json({ error: 'Símbolo e quantidade válidos são necessários.' });
+    }
+
+    try {
+        // Verificar se o usuário possui a ação e a quantidade suficiente
+        const acaoExistente = await dbGet(
+            'SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?',
+            [userId, simbolo]
+        );
+
+        if (!acaoExistente || acaoExistente.quantidade < quantidade) {
+            return res.status(400).json({ error: 'Quantidade insuficiente de ações para venda.' });
+        }
+
+        // Obter o preço atual da ação
+        const response = await fetch(
+            `https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`
+        );
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao obter preço da ação.');
+        }
+        const data = await response.json();
+        if (data.length === 0 || !data[0].c) {
+            throw new Error('Preço da ação não encontrado.');
+        }
+        const precoAtual = data[0].c;
+
+        const totalVenda = quantidade * precoAtual;
+
+        // Atualizar a quantidade de ações do usuário
+        const novaQuantidade = acaoExistente.quantidade - quantidade;
+        if (novaQuantidade > 0) {
+            await dbRun(
+                'UPDATE user_acoes SET quantidade = ? WHERE id = ?',
+                [novaQuantidade, acaoExistente.id]
+            );
+        } else {
+            await dbRun('DELETE FROM user_acoes WHERE id = ?', [acaoExistente.id]);
+        }
+
+        // Atualizar o saldo do usuário
+        await dbRun('UPDATE users SET saldo = saldo + ? WHERE id = ?', [totalVenda, userId]);
+
+        // Obter o novo saldo
+        const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
+
+        res.json({
+            message: `Vendidas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(
+                2
+            )} cada.`,
+            saldo: novoSaldo.saldo,
+        });
+    } catch (error) {
+        console.error('Erro ao vender ação:', error);
+        res.status(500).json({ error: error.message || 'Erro ao realizar a venda.' });
+    }
+});
+
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

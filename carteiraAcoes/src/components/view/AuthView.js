@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { TextInput, Button } from "react-native-paper";
 import { useAuth } from "../../context/AuthContext.js";
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Certifique-se de ter instalado react-native-vector-icons
+
 
 const AuthView = () => {
     const [email, setEmail] = useState('');
@@ -23,7 +25,7 @@ const AuthView = () => {
             if (token) {
                 try {
                     await loginWithToken(token);
-                   
+
                 } catch (error) {
                     Alert.alert('Erro de Autenticação', error.message);
                 }
@@ -32,7 +34,7 @@ const AuthView = () => {
 
         const subscription = Linking.addEventListener('url', handleDeepLink);
 
-       
+
         Linking.getInitialURL().then((url) => {
             if (url) {
                 handleDeepLink({ url });
@@ -136,7 +138,8 @@ const AuthView = () => {
                         mode="outlined"
                         onPress={handleGoogleOAuth}
                         style={styles.googleButton}
-                        labelStyle={styles.buttonLabel}
+                        labelStyle={styles.googleButtonLabel}
+                        icon={() => <Icon name="google" size={20} color="#DB4437" />}
                     >
                         Entrar com Google
                     </Button>
@@ -256,8 +259,17 @@ const styles = StyleSheet.create({
         width: '100%',
         paddingVertical: 10,
         borderRadius: 5,
-        borderColor: '#6200ee',
         borderWidth: 1,
+        borderColor: '#DB4437',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    googleButtonLabel: {
+        color: '#DB4437',
+        fontSize: 16,
+        marginLeft: 10,
     },
     buttonLabel: {
         fontSize: 18,
