@@ -1,5 +1,3 @@
-// src/components/view/AuthView.js
-
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { TextInput, Button } from "react-native-paper";

@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
