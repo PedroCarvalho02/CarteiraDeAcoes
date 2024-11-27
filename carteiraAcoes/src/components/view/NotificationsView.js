@@ -6,10 +6,11 @@ const NotificationsView = () => {
     const { alerts, fetchAlerts, deleteAlert } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
 
+    // Hook para carregar os alertas
     useEffect(() => {
         const loadAlerts = async () => {
             try {
-                await fetchAlerts();
+                await fetchAlerts();// Função para buscar alertas 
             } catch (error) {
                 Alert.alert('Erro', 'Não foi possível carregar alertas.');
             } finally {
@@ -18,7 +19,7 @@ const NotificationsView = () => {
         };
         loadAlerts();
     }, []);
-
+ // Função para excluir um alerta específico
     const handleDelete = async (id) => {
         try {
             await deleteAlert(id);

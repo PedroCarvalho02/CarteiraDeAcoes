@@ -79,7 +79,7 @@ const SaqueView = () => {
 
             Alert.alert('Sucesso', data.message || 'Saque realizado com sucesso!');
             setWithdrawValue('');
-            setSaldo(data.saldo); // Atualiza o saldo localmente
+            setSaldo(data.saldo); 
         } catch (error) {
             console.error('Erro ao realizar saque:', error);
             Alert.alert('Erro', error.message);

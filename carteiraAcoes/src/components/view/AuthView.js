@@ -2,9 +2,8 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { TextInput, Button } from "react-native-paper";
 import { useAuth } from "../../context/AuthContext.js";
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Certifique-se de ter instalado react-native-vector-icons
-
-
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+// tela para autenticação (Login e Registro)
 const AuthView = () => {
     const [email, setEmail] = useState('');
     const [senha, setSenha] = useState('');
@@ -13,48 +12,54 @@ const AuthView = () => {
     const [telefone, setTelefone] = useState('');
     const [cep, setCep] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const [isLoginMode, setIsLoginMode] = useState(true);
-    const { login, loginWithToken } = useAuth();
+    const [isLoginMode, setIsLoginMode] = useState(true); 
+    const { login, loginWithToken } = useAuth(); 
 
+    // Efeito para lidar com links profundos (Deep Links-> tecnica para app moveis para que os usuarios possam ser direcionados a uma parte especifica do app ao clicar em um link
     useEffect(() => {
         const handleDeepLink = async (event) => {
             const { url } = event;
             const token = getTokenFromUrl(url);
             if (token) {
                 try {
-                    await loginWithToken(token);
-
+                    await loginWithToken(token); // Realiza login com token extraído da URL
                 } catch (error) {
                     Alert.alert('Erro de Autenticação', error.message);
                 }
             }
         };
 
+        // -> linking( lida com links externos)
+        // ->  toda vez que receber um link a funcao trata
         const subscription = Linking.addEventListener('url', handleDeepLink);
 
-
+        // Verifica se há uma URL inicial se o app for aberto via link
         Linking.getInitialURL().then((url) => {
             if (url) {
                 handleDeepLink({ url });
             }
         });
 
+        // remove o subscription para evitar vazamento de memória
         return () => {
             subscription.remove();
         };
     }, []);
 
+    //  extrair o token da URL
     const getTokenFromUrl = (url) => {
         const regex = /token=([^&]+)/;
         const match = regex.exec(url);
         return match ? match[1] : null;
     };
 
+    // Função para iniciar a autenticacao via Google OAuth
     const handleGoogleOAuth = () => {
         const authUrl = 'https://hog-chief-visually.ngrok-free.app/auth';
         Linking.openURL(authUrl);
     };
 
+    // Função para login normal
     const Login = async () => {
         if (!email || !senha) {
             Alert.alert('Erro', 'Por favor, preencha todos os campos.');
@@ -67,7 +72,9 @@ const AuthView = () => {
         }
     };
 
+    // Função para o registro de um novo usuário
     const Registrar = async () => {
+        // Verifica se todos os campos necessários estão preenchidos
         if (!email || !senha || !nome || !cpf || !telefone || !cep) {
             Alert.alert('Erro', 'Por favor, preencha todos os campos.');
             return;
@@ -86,7 +93,7 @@ const AuthView = () => {
 
             if (response.ok) {
                 console.log(data.message);
-                setIsLoginMode(true);
+                setIsLoginMode(true); // muda para modo de login
                 Alert.alert('Sucesso', 'Registro realizado com sucesso! Por favor, faça login.');
             } else {
                 setErrorMessage(data.error || 'Erro ao registrar: ' + (data.details || data.message));
@@ -226,6 +233,7 @@ const AuthView = () => {
     );
 
 };
+
 
 const styles = StyleSheet.create({
     container: {

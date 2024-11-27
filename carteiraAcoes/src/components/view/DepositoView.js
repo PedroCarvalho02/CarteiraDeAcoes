@@ -3,12 +3,14 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 
+// tela de depósito
 const DepositoView = () => {
     const { token } = useAuth();
     const [depositValue, setDepositValue] = useState('');
-    const [saldo, setSaldo] = useState(0);
+    const [saldo, setSaldo] = useState(0); o
     const [isLoading, setIsLoading] = useState(false);
 
+    // Função para buscar o saldo 
     const fetchSaldo = async () => {
         try {
             setIsLoading(true);
@@ -31,14 +33,16 @@ const DepositoView = () => {
         }
     };
 
+    // Hook para função fetchSaldo sempre que abre a tela
     useFocusEffect(
         useCallback(() => {
             fetchSaldo();
         }, [token])
     );
 
+    // Função para processar o depósito 
     const handleSubmit = async () => {
-        const valorNumerico = parseFloat(depositValue);
+        const valorNumerico = parseFloat(depositValue); // Converte o valor do depósito para número
 
         if (isNaN(valorNumerico) || valorNumerico <= 0) {
             Alert.alert('Erro', 'Por favor, insira um valor válido para depósito.');
@@ -74,8 +78,8 @@ const DepositoView = () => {
     if (isLoading) {
         return (
             <View style={styles.container}>
-                <ActivityIndicator size="large" color="#6200ee" />
-                <Text style={styles.loadingText}>Processando...</Text>
+                <ActivityIndicator size="large" color="#6200ee" /> {/* Indicador de atividade */}
+                <Text style={styles.loadingText}>Processando...</Text> {/* Texto de carregamento */}
             </View>
         );
     }

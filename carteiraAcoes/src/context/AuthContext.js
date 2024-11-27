@@ -2,13 +2,14 @@ import React, { createContext, useState, useContext } from 'react';
 
 const AuthContext = createContext();
 
+// Provedor do contexto de autenticação
 export const AuthProvider = ({ children }) => {
     const [autenticado, setAutenticado] = useState(false);
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(null);
     const [alerts, setAlerts] = useState([]);
 
-    
+    // Função para realizar o login
     const login = async (email, senha) => {
         try {
             const response = await fetch('https://hog-chief-visually.ngrok-free.app/login', {
@@ -33,7 +34,7 @@ export const AuthProvider = ({ children }) => {
             throw error;
         }
     };
-
+// Função para realizar o login com um token 
     const loginWithToken = async (receivedToken) => {
         try {
             setToken(receivedToken);
@@ -52,7 +53,7 @@ export const AuthProvider = ({ children }) => {
         setToken(null);
         setAlerts([]);
     };
-
+// Função para buscar os alertas do usuário
     const fetchAlerts = async () => {
         if (!token) return;
         try {
@@ -118,7 +119,7 @@ export const AuthProvider = ({ children }) => {
             throw error;
         }
     };
-
+// Retorna o contexto com os valores e funções disponíveis
     return (
         <AuthContext.Provider value={{
             autenticado,
@@ -136,7 +137,7 @@ export const AuthProvider = ({ children }) => {
         </AuthContext.Provider>
     );
 };
-
+// Hook para acessar o contexto de autenticação
 export const useAuth = () => {
     return useContext(AuthContext);
 };

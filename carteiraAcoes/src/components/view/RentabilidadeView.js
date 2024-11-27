@@ -26,12 +26,14 @@ const RentabilidadeView = () => {
     const [targetPrice, setTargetPrice] = useState('');
     const [quantidadeVenda, setQuantidadeVenda] = useState('');
 
+    // Hook de atualizar rentabilidade ao abrir tela
     useFocusEffect(
         useCallback(() => {
             atualizarRentabilidade();
         }, [token])
     );
 
+ // Função para atualizar a rentabilidade das ações
     const atualizarRentabilidade = async () => {
         setIsLoading(true);
         try {
@@ -47,6 +49,7 @@ const RentabilidadeView = () => {
         }
     };
 
+// Função para buscar as ações do usuário
     const fetchAcoes = async () => {
         try {
             const response = await fetch('https://hog-chief-visually.ngrok-free.app/minhas-acoes', {
@@ -66,6 +69,7 @@ const RentabilidadeView = () => {
         }
     };
 
+// Função para buscar os preços atuais das ações
     const fetchPrecos = async () => {
         try {
             if (acoes.length === 0) return;
@@ -91,6 +95,7 @@ const RentabilidadeView = () => {
         }
     };
 
+// Função para calcular a rentabilidade total 
     const calcularRentabilidade = () => {
         let total = 0;
         acoes.forEach(acao => {
@@ -101,6 +106,7 @@ const RentabilidadeView = () => {
         setRentabilidadeTotal(total);
     };
 
+// Função para abrir o modal de alerta
     const openAlertModal = (acao) => {
         setSelectedAcao(acao);
         setAlertModalVisible(true);
@@ -124,6 +130,7 @@ const RentabilidadeView = () => {
         setVendaModalVisible(false);
     };
 
+ // Função para salvar um alerta 
     const saveAlert = async () => {
         if (!targetPrice || isNaN(parseFloat(targetPrice)) || parseFloat(targetPrice) <= 0) {
             Alert.alert('Erro', 'Por favor, insira um preço-alvo válido.');
@@ -139,6 +146,7 @@ const RentabilidadeView = () => {
         }
     };
 
+// Função para processar a venda de ações
     const handleVender = async () => {
         const quantidade = parseInt(quantidadeVenda);
         if (isNaN(quantidade) || quantidade <= 0) {
