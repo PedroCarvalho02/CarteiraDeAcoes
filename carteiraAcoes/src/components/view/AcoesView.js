@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+
 import {
     View,
     Text,
@@ -10,6 +11,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { BACKEND_URL } from '@env'
+
 
 // tela para exibir as ações
 const AcoesView = ({ navigation }) => {
@@ -27,7 +30,7 @@ const AcoesView = ({ navigation }) => {
     const fetchSaldo = async () => {
         try {
             setIsLoading(true);
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
+            const response = await fetch(`${BACKEND_URL}/saldo`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -50,7 +53,7 @@ const AcoesView = ({ navigation }) => {
     const fetchPrecos = async () => {
         try {
             const symbols = acoes.map(acao => acao.simbolo).join(',');
-            const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${symbols}`, {
+            const response = await fetch(`${BACKEND_URL}/stock-prices?symbols=${symbols}`, {
                 headers: {
                     'Accept': 'application/json',
                 },
@@ -101,7 +104,7 @@ const AcoesView = ({ navigation }) => {
                 }
 
                 try {
-                    const response = await fetch('https://hog-chief-visually.ngrok-free.app/comprar', {
+                    const response = await fetch(`${BACKEND_URL}/comprar`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

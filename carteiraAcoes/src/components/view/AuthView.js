@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { TextInput, Button } from "react-native-paper";
 import { useAuth } from "../../context/AuthContext.js";
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { BACKEND_URL } from '@env';
 // tela para autenticação (Login e Registro)
 const AuthView = () => {
     const [email, setEmail] = useState('');
@@ -53,11 +53,6 @@ const AuthView = () => {
         return match ? match[1] : null;
     };
 
-    // Função para iniciar a autenticacao via Google OAuth
-    const handleGoogleOAuth = () => {
-        const authUrl = 'https://hog-chief-visually.ngrok-free.app/auth';
-        Linking.openURL(authUrl);
-    };
 
     // Função para login normal
     const Login = async () => {
@@ -81,7 +76,7 @@ const AuthView = () => {
         }
 
         try {
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/register', {
+            const response = await fetch(`${BACKEND_URL}/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -138,15 +133,6 @@ const AuthView = () => {
                         labelStyle={styles.buttonLabel}
                     >
                         Entrar
-                    </Button>
-                    <Button
-                        mode="outlined"
-                        onPress={handleGoogleOAuth}
-                        style={styles.googleButton}
-                        labelStyle={styles.googleButtonLabel}
-                        icon={() => <Icon name="google" size={20} color="#DB4437" />}
-                    >
-                        Entrar com Google
                     </Button>
                 </>
             ) : (
@@ -260,22 +246,6 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         backgroundColor: '#6200ee',
         marginBottom: 10,
-    },
-    googleButton: {
-        width: '100%',
-        paddingVertical: 10,
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: '#DB4437',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 10,
-    },
-    googleButtonLabel: {
-        color: '#DB4437',
-        fontSize: 16,
-        marginLeft: 10,
     },
     buttonLabel: {
         fontSize: 18,

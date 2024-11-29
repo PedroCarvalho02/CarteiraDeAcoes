@@ -5,7 +5,6 @@ const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const { promisify } = require('util');
-const { OAuth2Client } = require('google-auth-library');
 const finnhub = require('finnhub');
 
 require('dotenv').config();
@@ -97,26 +96,23 @@ const dbRun = promisify(db.run).bind(db);
 
 async function createUser(user) {
     const { googleId, email, name, profilePicture } = user;
-
     const existingUser = await findUserByGoogleId(googleId);
     if (existingUser) {
         throw new Error('Usuário com este googleId já existe.');
     }
-
     await dbRun(
         'INSERT INTO users (googleId, email, nome, profilePicture) VALUES (?, ?, ?, ?)',
         [googleId, email, name, profilePicture]
     );
 }
+
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
     if (!token) {
         console.log('❌ Token não fornecido.');
         return res.status(401).json({ error: 'Token não fornecido.' });
     }
-
     jwt.verify(token, 'secret_key', (err, user) => {
         if (err) {
             console.log('❌ Token inválido.');
@@ -132,93 +128,18 @@ async function findUserByGoogleId(googleId) {
     return await dbGet('SELECT * FROM users WHERE googleId = ?', [googleId]);
 }
 
-app.get('/auth', (req, res) => {
-    const oauth2Client = new OAuth2Client(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URIS
-    );
-
-    const authUrl = oauth2Client.generateAuthUrl({
-        access_type: 'offline',
-        scope: ['profile', 'email'],
-        prompt: 'consent',
-    });
-
-    res.redirect(authUrl);
-});
-
-app.get('/auth/callback', async (req, res) => {
-    console.log('Callback Google recebido');
-    const { code } = req.query;
-
-    if (!code) {
-        console.error('❌ Código não encontrado');
-        return res.status(400).send('Código ausente');
-    }
-
-    try {
-        const oauth2Client = new OAuth2Client(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
-            process.env.GOOGLE_REDIRECT_URIS
-        );
-
-        console.log(' Obtendo tokens...');
-        const { tokens } = await oauth2Client.getToken(code);
-        oauth2Client.setCredentials(tokens);
-
-        console.log('🔄 Obtendo dados do usuário...');
-        const userInfoResponse = await oauth2Client.request({
-            url: 'https://www.googleapis.com/oauth2/v3/userinfo',
-        });
-
-        const userInfo = userInfoResponse.data;
-
-        let user = await findUserByGoogleId(userInfo.sub);
-
-        if (!user) {
-            console.log('Criando novo usuário');
-            await createUser({
-                googleId: userInfo.sub,
-                email: userInfo.email,
-                name: userInfo.name,
-                profilePicture: userInfo.picture,
-            });
-            user = await findUserByGoogleId(userInfo.sub);
-        }
-
-        const jwtToken = jwt.sign(
-            { id: user.id, email: user.email },
-            'secret_key',
-            { expiresIn: '1h' }
-        );
-        console.log('JWT gerado');
-
-        const redirectUrl = `${process.env.IP_FRONT}?token=${jwtToken}`;
-        console.log(' Redirecionando para:', redirectUrl);
-        res.redirect(redirectUrl);
-
-    } catch (error) {
-        console.error(' Erro:', error);
-        res.status(500).send('Erro na autenticação');
-    }
-});
 
 app.post('/register', async (req, res) => {
     const { email, senha, nome, cpf, telefone, cep } = req.body;
-
     try {
         const cpfExists = await dbGet('SELECT * FROM users WHERE cpf = ?', [cpf]);
         if (cpfExists) {
             return res.status(400).json({ error: 'CPF já está em uso.' });
         }
-
         const emailExists = await dbGet('SELECT * FROM users WHERE email = ?', [email]);
         if (emailExists) {
             return res.status(400).json({ error: 'E-mail já está em uso.' });
         }
-
         const hashedSenha = await bcrypt.hash(senha, 10);
         await dbRun(
             'INSERT INTO users (email, senha, nome, cpf, telefone, cep) VALUES (?, ?, ?, ?, ?, ?)',
@@ -233,18 +154,15 @@ app.post('/register', async (req, res) => {
 
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
-
     try {
         const usuario = await dbGet('SELECT * FROM users WHERE email = ?', [email]);
         if (!usuario) {
             return res.status(400).json({ error: 'Usuário não encontrado.' });
         }
-
         const senhaValida = await bcrypt.compare(senha, usuario.senha);
         if (!senhaValida) {
             return res.status(400).json({ error: 'Senha incorreta.' });
         }
-
         const token = jwt.sign(
             { id: usuario.id, email: usuario.email },
             'secret_key',
@@ -275,11 +193,9 @@ app.get('/saldo', authenticateToken, async (req, res) => {
 app.post('/deposito', authenticateToken, async (req, res) => {
     const { valor } = req.body;
     console.log(`Recebido depósito: valor = ${valor}, userId = ${req.userId}`);
-
     if (!valor || valor <= 0) {
         return res.status(400).json({ error: 'Valor de depósito inválido.' });
     }
-
     try {
         await dbRun('UPDATE users SET saldo = saldo + ? WHERE id = ?', [valor, req.userId]);
         const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
@@ -294,38 +210,30 @@ app.post('/deposito', authenticateToken, async (req, res) => {
 app.post('/saque', authenticateToken, async (req, res) => {
     const { valor } = req.body;
     console.log(`💸 Saque solicitado: valor = ${valor}, userId = ${req.userId}`);
-
     if (valor === undefined) {
         console.log('❌ Erro: Campo "valor" não fornecido.');
         return res.status(400).json({ error: 'O campo "valor" é obrigatório.' });
     }
-
     const valorSaque = parseFloat(valor);
     if (isNaN(valorSaque) || valorSaque <= 0) {
         console.log('❌ Erro: Valor do saque inválido.');
         return res.status(400).json({ error: 'O valor do saque deve ser um número positivo.' });
     }
-
     try {
         const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
         console.log(`🔍 Saldo atual do usuário (ID: ${req.userId}): ${usuario ? usuario.saldo : 'Não encontrado'}`);
-
         if (!usuario) {
             console.log('❌ Erro: Usuário não encontrado.');
             return res.status(404).json({ error: 'Usuário não encontrado.' });
         }
-
         if (valorSaque > usuario.saldo) {
             console.log('❌ Erro: Saldo insuficiente para saque.');
             return res.status(400).json({ error: 'Saldo insuficiente para realizar o saque.' });
         }
-
         await dbRun('UPDATE users SET saldo = saldo - ? WHERE id = ?', [valorSaque, req.userId]);
         console.log(`✅ Saque realizado: R$ ${valorSaque}, userId: ${req.userId}`);
-
         const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [req.userId]);
         console.log(`💰 Novo saldo para userId ${req.userId}: R$ ${novoSaldo.saldo}`);
-
         res.json({
             message: 'Saque realizado com sucesso!',
             saldo: novoSaldo.saldo
@@ -359,13 +267,11 @@ app.get('/stock-prices', async (req, res) => {
 app.post('/comprar', authenticateToken, async (req, res) => {
     const { simbolo, quantidade } = req.body;
     const userId = req.userId;
-
     if (!simbolo || !quantidade || quantidade <= 0) {
         return res.status(400).json({ error: 'Simbolo e quantidade válidos são necessários.' });
     }
-
     try {
-        const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`);
+        const response = await fetch(`https://seu-endereco.ngrok.io/stock-prices?symbols=${simbolo}`);
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Erro ao obter preço da ação.');
@@ -375,9 +281,7 @@ app.post('/comprar', authenticateToken, async (req, res) => {
             throw new Error('Preço da ação não encontrado.');
         }
         const precoAtual = data[0].c;
-
         const totalCompra = quantidade * precoAtual;
-
         const usuario = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
         if (!usuario) {
             return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -385,13 +289,10 @@ app.post('/comprar', authenticateToken, async (req, res) => {
         if (usuario.saldo < totalCompra) {
             return res.status(400).json({ error: 'Saldo insuficiente para realizar a compra.' });
         }
-
         const acaoExistente = await dbGet('SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?', [userId, simbolo]);
-
         if (acaoExistente) {
             const novaQuantidade = acaoExistente.quantidade + quantidade;
             const novoPrecoCompra = ((acaoExistente.quantidade * acaoExistente.preco_compra) + (quantidade * precoAtual)) / novaQuantidade;
-
             await dbRun(
                 'UPDATE user_acoes SET quantidade = ?, preco_compra = ? WHERE id = ?',
                 [novaQuantidade, novoPrecoCompra, acaoExistente.id]
@@ -402,11 +303,8 @@ app.post('/comprar', authenticateToken, async (req, res) => {
                 [userId, simbolo, quantidade, precoAtual]
             );
         }
-
         await dbRun('UPDATE users SET saldo = saldo - ? WHERE id = ?', [totalCompra, userId]);
-
         const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
-
         res.json({ message: `Compradas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(2)} cada.`, saldo: novoSaldo.saldo });
     } catch (error) {
         console.error('Erro ao comprar ação:', error);
@@ -416,7 +314,6 @@ app.post('/comprar', authenticateToken, async (req, res) => {
 
 app.get('/minhas-acoes', authenticateToken, async (req, res) => {
     const userId = req.userId;
-
     try {
         const acoes = await new Promise((resolve, reject) => {
             db.all(
@@ -431,7 +328,6 @@ app.get('/minhas-acoes', authenticateToken, async (req, res) => {
                 }
             );
         });
-
         res.json({ acoes });
     } catch (error) {
         console.error('Erro ao obter ações do usuário:', error);
@@ -442,23 +338,19 @@ app.get('/minhas-acoes', authenticateToken, async (req, res) => {
 app.post('/vender', authenticateToken, async (req, res) => {
     const { simbolo, quantidade } = req.body;
     const userId = req.userId;
-
     if (!simbolo || !quantidade || quantidade <= 0) {
         return res.status(400).json({ error: 'Símbolo e quantidade válidos são necessários.' });
     }
-
     try {
         const acaoExistente = await dbGet(
             'SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?',
             [userId, simbolo]
         );
-
         if (!acaoExistente || acaoExistente.quantidade < quantidade) {
             return res.status(400).json({ error: 'Quantidade insuficiente de ações para venda.' });
         }
-
         const response = await fetch(
-            `https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`
+            `https://seu-endereco.ngrok.io/stock-prices?symbols=${simbolo}`
         );
         if (!response.ok) {
             const errorData = await response.json();
@@ -469,9 +361,7 @@ app.post('/vender', authenticateToken, async (req, res) => {
             throw new Error('Preço da ação não encontrado.');
         }
         const precoAtual = data[0].c;
-
         const totalVenda = quantidade * precoAtual;
-
         const novaQuantidade = acaoExistente.quantidade - quantidade;
         if (novaQuantidade > 0) {
             await dbRun(
@@ -481,15 +371,10 @@ app.post('/vender', authenticateToken, async (req, res) => {
         } else {
             await dbRun('DELETE FROM user_acoes WHERE id = ?', [acaoExistente.id]);
         }
-
         await dbRun('UPDATE users SET saldo = saldo + ? WHERE id = ?', [totalVenda, userId]);
-
         const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
-
         res.json({
-            message: `Vendidas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(
-                2
-            )} cada.`,
+            message: `Vendidas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(2)} cada.`,
             saldo: novoSaldo.saldo,
         });
     } catch (error) {
@@ -501,17 +386,14 @@ app.post('/vender', authenticateToken, async (req, res) => {
 app.post('/alerts', authenticateToken, async (req, res) => {
     const { simbolo, target_price } = req.body;
     const userId = req.userId;
-
     if (!simbolo || !target_price || target_price <= 0) {
         return res.status(400).json({ error: 'Símbolo e preço-alvo válidos são necessários.' });
     }
-
     try {
         await dbRun(
             'INSERT INTO alerts (user_id, simbolo, target_price) VALUES (?, ?, ?)',
             [userId, simbolo, target_price]
         );
-
         res.status(201).json({ message: 'Alerta criado com sucesso!' });
     } catch (error) {
         console.error('Erro ao criar alerta:', error);
@@ -519,10 +401,8 @@ app.post('/alerts', authenticateToken, async (req, res) => {
     }
 });
 
-
 app.get('/alerts', authenticateToken, async (req, res) => {
     const userId = req.userId;
-
     try {
         const alerts = await new Promise((resolve, reject) => {
             db.all(
@@ -544,17 +424,14 @@ app.get('/alerts', authenticateToken, async (req, res) => {
     }
 });
 
-
 app.delete('/alerts/:id', authenticateToken, async (req, res) => {
     const userId = req.userId;
     const alertId = req.params.id;
-
     try {
         const alert = await dbGet('SELECT * FROM alerts WHERE id = ? AND user_id = ?', [alertId, userId]);
         if (!alert) {
             return res.status(404).json({ error: 'Alerta não encontrado.' });
         }
-
         await dbRun('DELETE FROM alerts WHERE id = ?', [alertId]);
         res.json({ message: 'Alerta removido com sucesso!' });
     } catch (error) {
@@ -574,14 +451,12 @@ const checkAlerts = async () => {
                 }
             });
         });
-
         if (alerts.length === 0) {
             console.log('Nenhum alerta para verificar.');
             return;
         }
-
         const symbols = [...new Set(alerts.map(alert => alert.simbolo))].join(',');
-        const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${symbols}`);
+        const response = await fetch(`https://seu-endereco2.ngrok.io/stock-prices?symbols=${symbols}`);
         if (!response.ok) {
             throw new Error('Erro ao buscar preços das ações para verificação de alertas.');
         }
@@ -590,7 +465,6 @@ const checkAlerts = async () => {
         pricesData.forEach(item => {
             pricesMap[item.symbol] = item.c;
         });
-
         for (const alert of alerts) {
             const currentPrice = pricesMap[alert.simbolo];
             if (currentPrice && currentPrice > alert.target_price) {
@@ -603,64 +477,6 @@ const checkAlerts = async () => {
     }
 };
 setInterval(checkAlerts, 60000);
-
-app.post('/vender', authenticateToken, async (req, res) => {
-    const { simbolo, quantidade } = req.body;
-    const userId = req.userId;
-
-   
-    if (!simbolo || !quantidade || quantidade <= 0) {
-        return res.status(400).json({ error: 'Símbolo e quantidade válidos são necessários.' });
-    }
-
-    try {
-        
-        const acaoExistente = await dbGet(
-            'SELECT * FROM user_acoes WHERE user_id = ? AND simbolo = ?',
-            [userId, simbolo]
-        );
-
-        if (!acaoExistente || acaoExistente.quantidade < quantidade) {
-            return res.status(400).json({ error: 'Quantidade insuficiente de ações para venda.' });
-        }
-
-        const response = await fetch(
-            `https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${simbolo}`
-        );
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao obter preço da ação.');
-        }
-        const data = await response.json();
-        if (data.length === 0 || !data[0].c) {
-            throw new Error('Preço da ação não encontrado.');
-        }
-        const precoAtual = data[0].c;
-
-        const totalVenda = quantidade * precoAtual;
-
-        const novaQuantidade = acaoExistente.quantidade - quantidade;
-        if (novaQuantidade > 0) {
-            await dbRun(
-                'UPDATE user_acoes SET quantidade = ? WHERE id = ?',
-                [novaQuantidade, acaoExistente.id]
-            );
-        } else {
-            await dbRun('DELETE FROM user_acoes WHERE id = ?', [acaoExistente.id]);
-        }
-        await dbRun('UPDATE users SET saldo = saldo + ? WHERE id = ?', [totalVenda, userId]);
-
-        const novoSaldo = await dbGet('SELECT saldo FROM users WHERE id = ?', [userId]);
-
-        res.json({
-            message: `Vendidas ${quantidade} ações de ${simbolo} por R$ ${precoAtual.toFixed(2)} cada.`,
-            saldo: novoSaldo.saldo,
-        });
-    } catch (error) {
-        console.error('Erro ao vender ação:', error);
-        res.status(500).json({ error: error.message || 'Erro ao realizar a venda.' });
-    }
-});
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

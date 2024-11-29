@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { BACKEND_URL } from '@env';
 
 const RentabilidadeView = () => {
     const { token, createAlert, fetchAlerts } = useAuth();
@@ -52,7 +53,7 @@ const RentabilidadeView = () => {
 // Função para buscar as ações do usuário
     const fetchAcoes = async () => {
         try {
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/minhas-acoes', {
+            const response = await fetch(`${BACKEND_URL}/minhas-acoes`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -74,7 +75,7 @@ const RentabilidadeView = () => {
         try {
             if (acoes.length === 0) return;
             const symbols = acoes.map(acao => acao.simbolo).join(',');
-            const response = await fetch(`https://hog-chief-visually.ngrok-free.app/stock-prices?symbols=${symbols}`, {
+            const response = await fetch(`${BACKEND_URL}/stock-prices?symbols=${symbols}`, {
                 headers: {
                     'Accept': 'application/json',
                 },
@@ -155,7 +156,7 @@ const RentabilidadeView = () => {
         }
 
         try {
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/vender', {
+            const response = await fetch(`${BACKEND_URL}/vender`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

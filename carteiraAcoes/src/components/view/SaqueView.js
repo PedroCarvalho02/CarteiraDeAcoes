@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { BACKEND_URL } from '@env';
+
 
 const SaqueView = () => {
     const { token } = useAuth();
@@ -20,7 +22,7 @@ const SaqueView = () => {
     const fetchSaldo = async () => {
         try {
             setIsLoading(true);
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
+            const response = await fetch(`${BACKEND_URL}/saldo`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -62,7 +64,7 @@ const SaqueView = () => {
 
         try {
             setIsLoading(true);
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/saque', {
+            const response = await fetch(`${BACKEND_URL}/saque`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

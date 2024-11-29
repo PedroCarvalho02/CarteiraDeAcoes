@@ -2,19 +2,20 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { BACKEND_URL } from '@env';
 
 // tela de depósito
 const DepositoView = () => {
     const { token } = useAuth();
     const [depositValue, setDepositValue] = useState('');
-    const [saldo, setSaldo] = useState(0); o
+    const [saldo, setSaldo] = useState(0); 
     const [isLoading, setIsLoading] = useState(false);
 
     // Função para buscar o saldo 
     const fetchSaldo = async () => {
         try {
             setIsLoading(true);
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/saldo', {
+            const response = await fetch(`${BACKEND_URL}/saldo`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -51,7 +52,7 @@ const DepositoView = () => {
 
         try {
             setIsLoading(true);
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/deposito', {
+            const response = await fetch(`${BACKEND_URL}/deposito`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

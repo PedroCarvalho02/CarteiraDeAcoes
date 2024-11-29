@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext } from 'react';
+import { BACKEND_URL } from '@env';
 
 const AuthContext = createContext();
 
@@ -12,7 +13,7 @@ export const AuthProvider = ({ children }) => {
     // Função para realizar o login
     const login = async (email, senha) => {
         try {
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/login', {
+            const response = await fetch(`${BACKEND_URL}/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -57,7 +58,7 @@ export const AuthProvider = ({ children }) => {
     const fetchAlerts = async () => {
         if (!token) return;
         try {
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/alerts', {
+            const response = await fetch(`${BACKEND_URL}/alerts`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -76,7 +77,7 @@ export const AuthProvider = ({ children }) => {
    
     const createAlert = async (simbolo, target_price) => {
         try {
-            const response = await fetch('https://hog-chief-visually.ngrok-free.app/alerts', {
+            const response = await fetch(`${BACKEND_URL}/alerts`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -101,7 +102,7 @@ export const AuthProvider = ({ children }) => {
 
     const deleteAlert = async (id) => {
         try {
-            const response = await fetch(`https://hog-chief-visually.ngrok-free.app/alerts/${id}`, {
+            const response = await fetch(`${BACKEND_URL}/alerts/${id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
