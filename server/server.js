@@ -350,7 +350,7 @@ app.post('/vender', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Quantidade insuficiente de ações para venda.' });
         }
         const response = await fetch(
-            `https://seu-endereco.ngrok.io/stock-prices?symbols=${simbolo}`
+            `http://3.214.12.19:3000/stock-prices?symbols=${simbolo}`
         );
         if (!response.ok) {
             const errorData = await response.json();
@@ -456,7 +456,7 @@ const checkAlerts = async () => {
             return;
         }
         const symbols = [...new Set(alerts.map(alert => alert.simbolo))].join(',');
-        const response = await fetch(`https://seu-endereco2.ngrok.io/stock-prices?symbols=${symbols}`);
+        const response = await fetch(`http://3.214.12.19:3000/stock-prices?symbols=${symbols}`);
         if (!response.ok) {
             throw new Error('Erro ao buscar preços das ações para verificação de alertas.');
         }
